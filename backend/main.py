@@ -4,9 +4,17 @@ import os
 import uuid
 
 from pipeline.run_gap1 import run_gap1
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="PROSE-MEET Gap 1 API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.post("/run-gap1")
 async def run_gap1_endpoint(file: UploadFile = File(...)):
