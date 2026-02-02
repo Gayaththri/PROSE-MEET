@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AudioUpload from "./components/AudioUpload";
+import AudioRecorder from "./components/AudioRecorder";
 import "./App.css";
 
 function App() {
@@ -11,6 +12,7 @@ function App() {
       <p className="subtitle">Prosody-Aware Meeting Intelligence System</p>
 
       <AudioUpload onResult={setResult} />
+      <AudioRecorder onResult={setResult} />
 
       {result && (
         <div className="section">
