@@ -1,16 +1,19 @@
 import { useRef, useState } from "react";
+import { runGap1 } from "../api/gap1";
 
-function AudioRecorder({ onResult }) {
+function AudioRecorder({ onJobCreated }) {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [audioURL, setAudioURL] = useState(null);
 
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+  const [isStartingJob, setIsStartingJob] = useState(false);
+
+  // Start recording
   const startRecording = async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
     const mediaRecorder = new MediaRecorder(stream);
+
     mediaRecorderRef.current = mediaRecorder;
     audioChunksRef.current = [];
 
@@ -25,67 +28,86 @@ function AudioRecorder({ onResult }) {
         type: "audio/webm",
       });
 
-      const url = URL.createObjectURL(audioBlob);
-      setAudioURL(url);
-
-      // === SEND TO BACKEND ===
-      const formData = new FormData();
-      formData.append("file", audioBlob, "recorded_meeting.webm");
-
-      setIsProcessing(true);
+      setIsStartingJob(true);
 
       try {
-        const response = await fetch(
-          "http://127.0.0.1:8000/run-gap1",
-          {
-            method: "POST",
-            body: formData,
-          },
-        );
+        // Send audio to backend bafor ckground job
+        const response = await runGap1(audioBlob);
 
-        const data = await response.json();
-        onResult(data);
+        if (!response?.job_id) {
+          throw new Error("No job_id returned from backend");
+        }
+
+        onJobCreated(response.job_id);
       } catch (err) {
-        alert("Backend processing failed");
         console.error(err);
+        alert("Failed to start background processing");
       } finally {
-        setIsProcessing(false);
+        setIsStartingJob(false);
       }
     };
 
     mediaRecorder.start();
     setIsRecording(true);
+    setIsPaused(false);
   };
 
+  // Pause/Resume recording
+  const togglePause = () => {
+    if (!mediaRecorderRef.current) return;
+
+    if (isPaused) {
+      mediaRecorderRef.current.resume();
+      setIsPaused(false);
+    } else {
+      mediaRecorderRef.current.pause();
+      setIsPaused(true);
+    }
+  };
+
+  // Stop recording
   const stopRecording = () => {
+    if (!mediaRecorderRef.current) return;
+
     mediaRecorderRef.current.stop();
     setIsRecording(false);
+    setIsPaused(false);
   };
 
   return (
-    <div style={{ marginTop: "32px" }}>
-      <h3>Record Meeting Audio</h3>
-
-      <button onClick={startRecording} disabled={isRecording}>
-        🎤 Start Recording
-      </button>
-
-      <button
-        onClick={stopRecording}
-        disabled={!isRecording}
-        style={{ marginLeft: "10px" }}
-      >
-        ⏹ Stop Recording
-      </button>
-
-      {isProcessing && (
-        <p style={{ marginTop: "12px" }}>⏳ Processing meeting...</p>
+    <div className="flex items-center gap-4">
+      {/* Record button */}
+      {!isRecording && (
+        <button
+          onClick={startRecording}
+          className="action-button bg-gray-900 text-white hover:bg-gray-800 transition"
+        >
+          🎤 Record
+        </button>
       )}
 
-      {audioURL && (
-        <div style={{ marginTop: "16px" }}>
-          <audio controls src={audioURL} />
-        </div>
+      {/* Pause/Resume + Stop buttons */}
+      {isRecording && (
+        <>
+          <button
+            onClick={togglePause}
+            className="action-button bg-gray-200 text-gray-800 hover:bg-gray-300 transition"
+          >
+            {isPaused ? "▶ Resume" : "⏸ Pause"}
+          </button>
+
+          <button
+            onClick={stopRecording}
+            className="action-button bg-red-600 text-white hover:bg-red-700 transition"
+          >
+            ⏹ Stop
+          </button>
+        </>
+      )}
+
+      {/* Status */}
+      {isStartingJob && (
+        <span className="text-sm text-gray-500 ml-2">Starting analysis…</span>
       )}
     </div>
   );

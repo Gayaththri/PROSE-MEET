@@ -1,19 +1,20 @@
-from fastapi import FastAPI, UploadFile, File
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-
 import shutil
 import os
-import uuid
 
 from pipeline.run_gap1 import run_gap1
 from utils.audio_convert import convert_to_wav
-
+from jobs import (
+    create_job,
+    update_job_status,
+    complete_job,
+    fail_job,
+    get_job,
+)
 
 app = FastAPI(title="PROSE-MEET Gap 1 API")
 
-# =========================
-# CORS CONFIGURATION
-# =========================
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173"],
@@ -23,42 +24,79 @@ app.add_middleware(
 )
 
 
-# =========================
-# GAP 1 ENDPOINT
-# =========================
+def process_gap1_job(job_id: str, input_audio_path: str):
+    try:
+        update_job_status(job_id, "processing")
+
+        # Convert if needed
+        wav_path = convert_to_wav(input_audio_path)
+
+        # Run Gap 1
+        result = run_gap1(wav_path)
+
+        complete_job(job_id, result)
+
+    except Exception as e:
+        fail_job(job_id, str(e))
+
+
+
 @app.post("/run-gap1")
-async def run_gap1_endpoint(file: UploadFile = File(...)):
+async def run_gap1_endpoint(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...)
+):
     """
-    Run prosody-aware importance detection (Gap 1)
-    on an uploaded or recorded meeting audio file.
-
-    Supports heterogeneous audio formats by normalizing
-    to WAV (16kHz, mono) before analysis.
+    Starts Gap 1 as an async background job.
     """
 
-    # 1. Ensure temp directory exists
-    temp_dir = "temp_audio"
-    os.makedirs(temp_dir, exist_ok=True)
+    os.makedirs("temp_audio", exist_ok=True)
 
-    # 2. Save uploaded file (webm / wav / mp3 / etc.)
-    file_id = str(uuid.uuid4())
+    job_id = create_job()
+
     temp_input_path = os.path.join(
-        temp_dir, f"{file_id}_{file.filename}"
+        "temp_audio", f"{job_id}_{file.filename}"
     )
 
     with open(temp_input_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # 3. Normalize audio format → WAV (16kHz, mono)
-    wav_path = convert_to_wav(temp_input_path)
+    background_tasks.add_task(
+        process_gap1_job,
+        job_id,
+        temp_input_path
+    )
 
-    # 4. Run Gap 1 pipeline ONLY on normalized WAV
-    result = run_gap1(wav_path)
-
-    # 5. Return structured response to frontend
     return {
-        "transcript": result["transcript"],
-        "summary": result["summary"],
-        "highlights": result["highlights"],
-        "speakers": result["speakers"],
+        "job_id": job_id,
+        "status": "queued",
     }
+
+
+@app.get("/status/{job_id}")
+def get_job_status(job_id: str):
+    job = get_job(job_id)
+
+    if not job:
+        return {"status": "not_found"}
+
+    return {
+        "status": job["status"],
+        "error": job.get("error"),
+    }
+
+
+@app.get("/result/{job_id}")
+def get_job_result(job_id: str):
+    job = get_job(job_id)
+
+    if not job:
+        return {"error": "Job not found"}
+
+    if job["status"] != "completed":
+        return {
+            "status": job["status"],
+            "error": "Job not completed yet",
+        }
+
+    return job["result"]

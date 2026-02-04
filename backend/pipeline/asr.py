@@ -1,19 +1,21 @@
 import whisper
 
+# Load model ONCE (very important for speed)
+model = whisper.load_model("tiny")
 
-def transcribe_audio(audio):
+
+def transcribe_audio(audio_path: str):
     """
-    Transcribe audio using Whisper and return timestamped segments.
-
-    Returns:
-    - List of dicts with: segment_id, start, end, text
+    Transcribe full audio using Whisper (fast mode).
+    Returns timestamped segments.
     """
 
-    # Load Whisper model (base is sufficient for IPD)
-    model = whisper.load_model("base")
-
-    # Run transcription
-    result = model.transcribe(audio, fp16=False)
+    result = model.transcribe(
+        audio_path,          
+        fp16=False,          # CPU safe
+        verbose=False,
+        word_timestamps=False
+    )
 
     segments = []
     for i, seg in enumerate(result["segments"]):
@@ -21,7 +23,7 @@ def transcribe_audio(audio):
             "segment_id": i,
             "start": float(seg["start"]),
             "end": float(seg["end"]),
-            "text": seg["text"].strip()
+            "text": seg["text"].strip(),
         })
 
     return segments

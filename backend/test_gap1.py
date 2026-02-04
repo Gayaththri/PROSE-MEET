@@ -1,7 +1,7 @@
 from pipeline.run_gap1 import run_gap1
 
 if __name__ == "__main__":
-    audio_path = "../data/test_audio/meeting.wav"  # update filename if needed
+    audio_path = "../data/test_audio/meeting.wav"  
 
     result = run_gap1(audio_path)
 

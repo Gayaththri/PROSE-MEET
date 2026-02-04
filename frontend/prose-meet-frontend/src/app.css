@@ -1,38 +1,41 @@
-/* ===== Global Layout ===== */
-.app-container {
-  padding: 32px;
-  font-family: Arial, sans-serif;
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* -------------------------
+   Global App Styles
+-------------------------- */
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  background-color: #f3f4f6; 
 }
 
 .subtitle {
-  color: #555;
-  margin-bottom: 20px;
+  color: #4b5563; 
+  margin-top: 4px;
 }
 
 .section {
-  margin-top: 32px;
+  margin-top: 40px;
 }
 
-/* ===== Summary ===== */
 .summary-box {
-  background: #f5f5f5;
+  background: white;
   padding: 16px;
-  border-radius: 4px;
-}
-
-/* ===== Prosody Highlights ===== */
-.highlights-list {
-  padding-left: 20px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
 }
 
 .highlights-list li {
+  background: #eef2ff;
+  padding: 12px;
+  border-left: 4px solid #6366f1;
   margin-bottom: 12px;
-  background: #e3f2fd;
-  padding: 10px;
-  border-left: 4px solid #1976d2;
+  border-radius: 4px;
 }
 
-/* ===== Speaker Contribution ===== */
 .speaker-container {
   max-width: 600px;
 }
@@ -42,39 +45,50 @@
 }
 
 .speaker-bar-bg {
-  height: 18px;
-  background: #e0e0e0;
-  border-radius: 4px;
+  background: #e5e7eb;
+  height: 16px;
+  border-radius: 999px;
   overflow: hidden;
   margin-top: 4px;
 }
 
 .speaker-bar-fill {
+  background: #22c55e;
   height: 100%;
-  background: #4caf50;
 }
 
-/* ===== Transcript ===== */
 .transcript-box {
   max-height: 400px;
   overflow-y: auto;
-  border: 1px solid #ddd;
+  background: white;
   padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
 }
 
 .transcript-line {
   padding: 6px;
   margin-bottom: 6px;
-  border-left: 4px solid transparent;
 }
 
 .transcript-line.important {
-  background-color: #fff3cd;
-  border-left: 4px solid #ff9800;
+  background: #fff7ed;
+  border-left: 4px solid #f97316;
 }
 
 .important-tag {
   margin-left: 8px;
-  color: #ff9800;
+  color: #f97316;
   font-weight: bold;
+}
+
+.action-button {
+  height: 56px;
+  padding: 0 28px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
 }
