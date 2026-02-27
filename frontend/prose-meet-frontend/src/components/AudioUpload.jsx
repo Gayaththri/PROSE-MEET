@@ -14,11 +14,25 @@ export default function AudioUpload({ onJobCreated }) {
     fileInputRef.current?.click();
   };
 
-  // File selected
+  // File selected via input
   const handleFileChange = (e) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
     setFile(selected);
+  };
+
+  // File dropped onto dropzone
+  const handleDrop = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropped = e.dataTransfer?.files?.[0];
+    if (!dropped) return;
+    setFile(dropped);
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
   };
 
   // Send file to backend (background job)
@@ -49,74 +63,81 @@ export default function AudioUpload({ onJobCreated }) {
 
   return (
     <>
-      {/* Main import button */}
       <button
+        type="button"
         onClick={() => setOpen(true)}
-        className="action-button bg-indigo-600 text-white hover:bg-indigo-700 transition"
+        className="action-button saas-btn-primary"
       >
-        📁 Import Audio
+        <img
+          src="https://cdn-icons-png.flaticon.com/512/3185/3185902.png"
+          alt=""
+          className="saas-btn-icon saas-btn-icon-img saas-btn-icon-white"
+          width={20}
+          height={20}
+        />
+        Upload Audio
       </button>
 
-      {/* Modal */}
       <Modal isOpen={open} onClose={() => setOpen(false)}>
-        {/* Hidden file input */}
         <input
           ref={fileInputRef}
           type="file"
-          accept="audio/*"
+          accept="audio/*,video/mp4,video/webm,video/x-msvideo"
           onChange={handleFileChange}
           className="hidden"
         />
 
-        {/* Drag & Drop state */}
         {!file && (
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center">
-            <p className="text-lg font-medium">Drag & Drop</p>
-            <p className="text-sm text-gray-500 mt-2">
-              AAC, MP3, WAV, M4A, MP4
+          <div
+            className="saas-dropzone"
+            onDragOver={handleDragOver}
+            onDrop={handleDrop}
+            onClick={handleBrowseClick}
+            onKeyDown={(e) => e.key === "Enter" && handleBrowseClick()}
+            role="button"
+            tabIndex={0}
+          >
+            <p className="saas-dropzone-title">Drop your file here</p>
+            <p className="saas-dropzone-hint">
+              or click to browse — MP3, WAV, M4A, AAC, MP4, AVI
             </p>
-
             <button
-              onClick={handleBrowseClick}
-              className="mt-6 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleBrowseClick();
+              }}
+              className="saas-dropzone-btn"
             >
               Browse files
             </button>
           </div>
         )}
 
-        {/* File selected */}
         {file && (
-          <div className="space-y-4">
-            <div className="flex justify-between items-center border rounded-lg p-4">
-              <div>
-                <p className="font-medium">{file.name}</p>
-                <p className="text-sm text-gray-500">
-                  {(file.size / (1024 * 1024)).toFixed(2)} MB
-                </p>
-              </div>
-
+          <div className="saas-file-selected">
+            <div className="saas-file-info">
+              <p className="saas-file-name">{file.name}</p>
+              <p className="saas-file-size">
+                {(file.size / (1024 * 1024)).toFixed(2)} MB
+              </p>
               {!loading && (
                 <button
+                  type="button"
                   onClick={() => setFile(null)}
-                  className="text-red-500 text-sm hover:underline"
+                  className="saas-file-remove"
                 >
                   Remove
                 </button>
               )}
             </div>
-
-            {/* Start analysis */}
             <button
+              type="button"
               onClick={handleRun}
               disabled={loading}
-              className={`w-full py-3 rounded-lg font-medium transition ${
-                loading
-                  ? "bg-gray-400 text-white cursor-not-allowed"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
+              className={`saas-btn-submit ${loading ? "is-loading" : ""}`}
             >
-              {loading ? "Starting analysis…" : "Start Analysis"}
+              {loading ? "Starting…" : "Start analysis"}
             </button>
           </div>
         )}

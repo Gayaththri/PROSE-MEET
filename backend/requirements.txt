@@ -1,0 +1,13 @@
+# PROSE-MEET backend
+fastapi>=0.100.0
+uvicorn[standard]>=0.22.0
+python-dotenv>=1.0.0
+python-multipart>=0.0.6
+librosa>=0.10.0
+numpy>=1.24.0
+soundfile>=0.12.0
+# ASR: faster-whisper is 4x faster than openai-whisper with same/better accuracy
+faster-whisper>=1.0.0
+# PostgreSQL (research-grade storage for meetings)
+sqlalchemy>=2.0.0
+psycopg2-binary>=2.9.0

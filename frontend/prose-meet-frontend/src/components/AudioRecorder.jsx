@@ -75,39 +75,43 @@ function AudioRecorder({ onJobCreated }) {
   };
 
   return (
-    <div className="flex items-center gap-4">
-      {/* Record button */}
+    <div className="saas-record-wrap">
       {!isRecording && (
         <button
+          type="button"
           onClick={startRecording}
-          className="action-button bg-gray-900 text-white hover:bg-gray-800 transition"
+          className="action-button saas-btn-secondary"
         >
-          🎤 Record
+          <span className="saas-btn-icon saas-record-icon" aria-hidden>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <circle cx="12" cy="12" r="8" fill="currentColor" />
+            </svg>
+          </span>
+          Record
         </button>
       )}
 
-      {/* Pause/Resume + Stop buttons */}
       {isRecording && (
         <>
           <button
+            type="button"
             onClick={togglePause}
-            className="action-button bg-gray-200 text-gray-800 hover:bg-gray-300 transition"
+            className="action-button saas-btn-outline"
           >
             {isPaused ? "▶ Resume" : "⏸ Pause"}
           </button>
-
           <button
+            type="button"
             onClick={stopRecording}
-            className="action-button bg-red-600 text-white hover:bg-red-700 transition"
+            className="action-button saas-btn-stop"
           >
             ⏹ Stop
           </button>
         </>
       )}
 
-      {/* Status */}
       {isStartingJob && (
-        <span className="text-sm text-gray-500 ml-2">Starting analysis…</span>
+        <span className="saas-status-inline">Starting analysis…</span>
       )}
     </div>
   );
