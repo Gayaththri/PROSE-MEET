@@ -1,24 +1,23 @@
-export default function Modal({ isOpen, onClose, children }) {
+import { XMarkIcon } from "@heroicons/react/24/outline";
+
+export default function Modal({
+  isOpen,
+  onClose,
+  children,
+  title = "Import meeting audio",
+}) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-xl relative">
-        {/* Header */}
-        <div className="flex justify-between items-center px-6 py-4 border-b">
-          <h2 className="text-lg font-semibold">
-            Transcribe audio and video
-          </h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-black text-xl"
-          >
-            ✕
+    <div className="saas-modal-backdrop" onClick={onClose}>
+      <div className="saas-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="saas-modal-header">
+          <h2>{title}</h2>
+          <button type="button" onClick={onClose} className="saas-modal-close" aria-label="Close">
+            <XMarkIcon width={16} height={16} aria-hidden="true" />
           </button>
         </div>
-
-        {/* Content */}
-        <div className="p-6">{children}</div>
+        <div className="saas-modal-body">{children}</div>
       </div>
     </div>
   );

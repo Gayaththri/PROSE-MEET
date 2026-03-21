@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { runGap1 } from "../api/gap1";
+import { runGap1, runGap1WithOptions } from "../api/gap1";
 import Modal from "./Modal";
 
 export default function AudioUpload({ onJobCreated }) {
@@ -8,6 +8,7 @@ export default function AudioUpload({ onJobCreated }) {
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [quickPreview, setQuickPreview] = useState(false);
 
   // Open file picker
   const handleBrowseClick = () => {
@@ -41,18 +42,36 @@ export default function AudioUpload({ onJobCreated }) {
     setLoading(true);
 
     try {
-      const response = await runGap1(file);
+      const fullResponse = await runGap1(file);
 
-      // Expect backend to return { job_id }
-      if (!response?.job_id) {
+      if (!fullResponse?.job_id) {
         throw new Error("No job_id returned from backend");
       }
 
-      onJobCreated(response.job_id);
+      let previewResponse = null;
+      if (quickPreview) {
+        try {
+          previewResponse = await runGap1WithOptions(file, {
+            preview: true,
+            previewSeconds: 45,
+            relatedJobId: fullResponse.job_id,
+          });
+        } catch (previewError) {
+          console.error("Quick preview could not be started:", previewError);
+        }
+      }
+
+      onJobCreated({
+        fullJobId: fullResponse.job_id,
+        previewJobId: previewResponse?.job_id || null,
+        previewEnabled: Boolean(previewResponse?.job_id),
+        previewSeconds: quickPreview ? 45 : null,
+      });
 
       // Reset UI
       setOpen(false);
       setFile(null);
+      setQuickPreview(false);
     } catch (err) {
       console.error(err);
       alert("Failed to start audio processing");
@@ -79,6 +98,13 @@ export default function AudioUpload({ onJobCreated }) {
       </button>
 
       <Modal isOpen={open} onClose={() => setOpen(false)}>
+        <div className="saas-modal-copy">
+          <p className="saas-modal-eyebrow">Upload audio or video</p>
+          <p className="saas-modal-description">
+            Supported formats include MP3, WAV, M4A, AAC, MP4, AVI, and WebM.
+          </p>
+        </div>
+
         <input
           ref={fileInputRef}
           type="file"
@@ -107,7 +133,7 @@ export default function AudioUpload({ onJobCreated }) {
                 e.stopPropagation();
                 handleBrowseClick();
               }}
-              className="saas-dropzone-btn"
+              className="action-button saas-btn-primary saas-dropzone-btn"
             >
               Browse files
             </button>
@@ -131,13 +157,25 @@ export default function AudioUpload({ onJobCreated }) {
                 </button>
               )}
             </div>
+            <label className="saas-option-row">
+              <input
+                type="checkbox"
+                checked={quickPreview}
+                onChange={(e) => setQuickPreview(e.target.checked)}
+                disabled={loading}
+              />
+              <span>
+                Quick preview mode
+                <small> Show a fast 45s preview while the full analysis continues.</small>
+              </span>
+            </label>
             <button
               type="button"
               onClick={handleRun}
               disabled={loading}
-              className={`saas-btn-submit ${loading ? "is-loading" : ""}`}
+              className={`action-button saas-btn-primary saas-btn-submit ${loading ? "is-loading" : ""}`}
             >
-              {loading ? "Starting…" : "Start analysis"}
+              {loading ? "Starting…" : quickPreview ? "Start preview + full analysis" : "Start analysis"}
             </button>
           </div>
         )}

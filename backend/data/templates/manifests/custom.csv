@@ -1,0 +1,3 @@
+id,audio_path,transcript_ref_path,summary_ref_path,domain,split
+custom_001,/path/to/audio1.wav,/path/to/transcript_ref1.json,/path/to/summary_ref1.txt,corporate,train
+custom_002,/path/to/audio2.wav,/path/to/transcript_ref2.json,/path/to/summary_ref2.txt,academic,test

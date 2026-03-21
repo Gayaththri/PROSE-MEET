@@ -1,0 +1,7 @@
+text,label,meeting_id,true_domain,start,end
+"We should decide the budget by Friday.",1,meeting_001,corporate,0.0,3.5
+"Okay sounds good.",0,meeting_001,corporate,3.5,5.0
+"The main deliverable is the report.",1,meeting_001,corporate,5.0,8.0
+"Let me take a note.",0,meeting_001,corporate,8.0,10.0
+"Action item: send the draft by Monday.",1,meeting_002,academic,0.0,4.0
+"Thanks everyone.",0,meeting_002,academic,4.0,5.0

@@ -12,9 +12,8 @@ def is_16k_mono_wav(path: str) -> bool:
         if not path.lower().endswith(".wav"):
             return False
 
-        data, sr = sf.read(path)
-        is_mono = len(data.shape) == 1
-        return sr == 16000 and is_mono
+        info = sf.info(path)
+        return int(info.samplerate) == 16000 and int(info.channels) == 1
 
     except Exception:
         return False
@@ -31,6 +30,7 @@ def convert_to_wav(input_path: str, target_sr: int = 16000) -> str:
         print("✔ Audio already 16kHz mono WAV. Skipping FFmpeg.")
         return input_path
 
+    os.makedirs("temp_audio", exist_ok=True)
     output_path = f"temp_audio/{uuid.uuid4()}.wav"
 
     command = [
@@ -42,14 +42,67 @@ def convert_to_wav(input_path: str, target_sr: int = 16000) -> str:
         output_path
     ]
 
-    subprocess.run(
-        command,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        check=True
-    )
+    try:
+        result = subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=300,
+            text=True,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Audio conversion timed out after 5 minutes")
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip() or "(no stderr)"
+        if len(stderr) > 500:
+            stderr = stderr[:500] + "..."
+        raise RuntimeError(f"FFmpeg conversion failed: {stderr}")
 
     if not os.path.exists(output_path):
-        raise RuntimeError("Audio conversion failed")
+        raise RuntimeError("Audio conversion failed: output file was not created")
+
+    return output_path
+
+
+def create_preview_clip(input_path: str, preview_seconds: int, target_sr: int = 16000) -> str:
+    """
+    Create a short 16kHz mono WAV clip from the start of the recording.
+    """
+    preview_seconds = int(max(1, preview_seconds))
+    os.makedirs("temp_audio", exist_ok=True)
+    output_path = f"temp_audio/{uuid.uuid4()}_preview.wav"
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        input_path,
+        "-t",
+        str(preview_seconds),
+        "-ac",
+        "1",
+        "-ar",
+        str(target_sr),
+        output_path,
+    ]
+    try:
+        subprocess.run(
+            command,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=True,
+            timeout=300,
+            text=True,
+        )
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Preview audio conversion timed out after 5 minutes")
+    except subprocess.CalledProcessError as e:
+        stderr = (e.stderr or "").strip() or "(no stderr)"
+        if len(stderr) > 500:
+            stderr = stderr[:500] + "..."
+        raise RuntimeError(f"Preview audio conversion failed: {stderr}")
+
+    if not os.path.exists(output_path):
+        raise RuntimeError("Preview audio conversion failed: output file was not created")
 
     return output_path

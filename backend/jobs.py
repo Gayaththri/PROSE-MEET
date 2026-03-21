@@ -1,8 +1,9 @@
+import copy
 import json
 import os
 import threading
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
 jobs = {}
 jobs_lock = threading.Lock()
@@ -18,29 +19,186 @@ def _ensure_meetings_dir():
     os.makedirs(MEETINGS_DIR, exist_ok=True)
 
 
-def create_job():
+def _now_iso():
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _create_job_state(
+    filename=None,
+    preview=False,
+    preview_seconds=None,
+    related_job_id=None,
+    persist_result=True,
+):
+    timestamp = _now_iso()
+    return {
+        "status": "queued",
+        "result": None,
+        "partial_result": None,
+        "error": None,
+        "stage": "queued",
+        "stage_label": "Queued",
+        "progress": 0.0,
+        "eta_seconds": None,
+        "started_at": timestamp,
+        "updated_at": timestamp,
+        "cancel_requested": False,
+        "filename": filename or "meeting",
+        "preview": bool(preview),
+        "preview_seconds": preview_seconds,
+        "related_job_id": related_job_id,
+        "persist_result": bool(persist_result),
+    }
+
+
+def create_job(
+    filename=None,
+    preview=False,
+    preview_seconds=None,
+    related_job_id=None,
+    persist_result=True,
+):
     job_id = str(uuid.uuid4())
     with jobs_lock:
-        jobs[job_id] = {
-            "status": "queued",
-            "result": None,
-            "error": None,
-        }
+        jobs[job_id] = _create_job_state(
+            filename=filename,
+            preview=preview,
+            preview_seconds=preview_seconds,
+            related_job_id=related_job_id,
+            persist_result=persist_result,
+        )
     return job_id
 
 
-def update_job_status(job_id, status):
+def update_job(job_id, **updates):
     with jobs_lock:
-        if job_id in jobs:
-            jobs[job_id]["status"] = status
+        if job_id not in jobs:
+            return None
+        jobs[job_id].update(updates)
+        jobs[job_id]["updated_at"] = _now_iso()
+        return copy.deepcopy(jobs[job_id])
 
 
-def complete_job(job_id, result, filename=None):
+def update_job_status(job_id, status, **extra):
+    payload = {"status": status}
+    payload.update(extra)
+    if status == "queued":
+        payload.setdefault("progress", 0.0)
+        payload.setdefault("stage", "queued")
+        payload.setdefault("stage_label", "Queued")
+    elif status == "processing":
+        payload.setdefault("stage", "starting")
+        payload.setdefault("stage_label", "Starting analysis")
+    elif status == "completed":
+        payload.setdefault("progress", 1.0)
+        payload.setdefault("stage", "completed")
+        payload.setdefault("stage_label", "Completed")
+        payload.setdefault("eta_seconds", 0.0)
+    elif status == "failed":
+        payload.setdefault("stage", "failed")
+        payload.setdefault("stage_label", "Failed")
+    elif status == "cancelling":
+        payload.setdefault("stage_label", "Cancelling")
+    elif status == "cancelled":
+        payload.setdefault("progress", 1.0)
+        payload.setdefault("stage", "cancelled")
+        payload.setdefault("stage_label", "Cancelled")
+        payload.setdefault("eta_seconds", 0.0)
+    return update_job(job_id, **payload)
+
+
+def update_job_progress(
+    job_id,
+    *,
+    stage=None,
+    stage_label=None,
+    progress=None,
+    eta_seconds=None,
+    partial_result=None,
+    status=None,
+    **extra,
+):
+    payload = dict(extra)
+    if status:
+        payload["status"] = status
+    if stage is not None:
+        payload["stage"] = stage
+    if stage_label is not None:
+        payload["stage_label"] = stage_label
+    if progress is not None:
+        payload["progress"] = float(max(0.0, min(1.0, progress)))
+    if eta_seconds is not None:
+        payload["eta_seconds"] = float(max(0.0, eta_seconds))
+    if partial_result is not None:
+        payload["partial_result"] = partial_result
+    return update_job(job_id, **payload)
+
+
+def set_partial_result(job_id, partial_result):
+    return update_job(job_id, partial_result=partial_result)
+
+
+def set_related_job(job_id, related_job_id):
+    return update_job(job_id, related_job_id=related_job_id)
+
+
+def request_job_cancel(job_id):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        if not job:
+            return False
+        if job.get("status") in {"completed", "failed", "cancelled"}:
+            return False
+        job["cancel_requested"] = True
+        if job.get("status") == "queued":
+            job["status"] = "cancelled"
+            job["stage"] = "cancelled"
+            job["stage_label"] = "Cancelled"
+            job["progress"] = 1.0
+            job["eta_seconds"] = 0.0
+            job["error"] = "Processing cancelled by user."
+        elif job.get("status") != "cancelled":
+            job["status"] = "cancelling"
+            job["stage_label"] = "Cancelling"
+        job["updated_at"] = _now_iso()
+        return True
+
+
+def is_cancel_requested(job_id):
+    with jobs_lock:
+        job = jobs.get(job_id)
+        return bool(job and job.get("cancel_requested"))
+
+
+def cancel_job(job_id, message="Processing cancelled by user."):
+    return update_job_status(
+        job_id,
+        "cancelled",
+        error=message,
+        cancel_requested=True,
+        partial_result=None,
+    )
+
+
+def complete_job(job_id, result, filename=None, persist_result=True):
+    # Ensure transcript is always chronological before exposing/saving result.
+    if isinstance(result, dict) and isinstance(result.get("transcript"), list):
+        result["transcript"] = sorted(
+            result["transcript"],
+            key=lambda x: float((x or {}).get("start", 0.0) or 0.0),
+        )
     with jobs_lock:
         if job_id in jobs:
             jobs[job_id]["status"] = "completed"
             jobs[job_id]["result"] = result
-    save_meeting(job_id, result, filename)
+            jobs[job_id]["partial_result"] = None
+            jobs[job_id]["progress"] = 1.0
+            jobs[job_id]["stage"] = "completed"
+            jobs[job_id]["stage_label"] = "Completed"
+            jobs[job_id]["eta_seconds"] = 0.0
+            jobs[job_id]["updated_at"] = _now_iso()
+    if persist_result:
+        save_meeting(job_id, result, filename)
 
 
 def save_meeting(job_id, result, filename=None):
@@ -58,11 +216,16 @@ def save_meeting(job_id, result, filename=None):
 
 def _save_meeting_file(job_id, result, filename=None):
     _ensure_meetings_dir()
+    if isinstance(result, dict) and isinstance(result.get("transcript"), list):
+        result["transcript"] = sorted(
+            result["transcript"],
+            key=lambda x: float((x or {}).get("start", 0.0) or 0.0),
+        )
     path = os.path.join(MEETINGS_DIR, f"{job_id}.json")
     payload = {
         "id": job_id,
         "filename": filename or "meeting",
-        "created_at": datetime.utcnow().isoformat() + "Z",
+        "created_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "result": result,
     }
     with open(path, "w", encoding="utf-8") as f:
@@ -70,15 +233,13 @@ def _save_meeting_file(job_id, result, filename=None):
 
 
 def fail_job(job_id, error_message):
-    with jobs_lock:
-        if job_id in jobs:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = error_message
+    update_job_status(job_id, "failed", error=error_message)
 
 
 def get_job(job_id):
     with jobs_lock:
-        return jobs.get(job_id)
+        job = jobs.get(job_id)
+        return copy.deepcopy(job) if job is not None else None
 
 
 def list_meetings():
@@ -98,10 +259,12 @@ def list_meetings():
         try:
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
+            result = data.get("result") or {}
             out.append({
                 "id": data.get("id", name.replace(".json", "")),
                 "filename": data.get("filename", "meeting"),
                 "created_at": data.get("created_at", ""),
+                "duration_seconds": result.get("duration_seconds"),
             })
         except Exception:
             continue
@@ -129,6 +292,53 @@ def get_meeting_result(job_id):
     try:
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return data.get("result")
+        result = data.get("result") or {}
+        # Ensure filename is on result for overview panel (from wrapper if not in result)
+        if "filename" not in result:
+            result["filename"] = data.get("filename") or "meeting"
+        return result
     except Exception:
         return None
+
+
+def delete_meeting(job_id: str):
+    """
+    Delete a saved meeting from PostgreSQL or file storage.
+    Also removes the associated recording file if present.
+    """
+    # Load result once so we can clean up the recording afterwards.
+    result = get_meeting_result(job_id)
+
+    removed = False
+    if _use_postgres():
+        try:
+            from database import delete_meeting_from_db
+            removed = delete_meeting_from_db(job_id)
+        except Exception:
+            removed = False
+    else:
+        path = os.path.join(MEETINGS_DIR, f"{job_id}.json")
+        if os.path.isfile(path):
+            try:
+                os.remove(path)
+                removed = True
+            except Exception:
+                removed = False
+
+    # Best-effort cleanup of the original recording file (if we know it).
+    if result:
+        recording_path = result.get("recording_path")
+        if recording_path:
+            backend_root = os.path.join(os.path.dirname(__file__), "..")
+            full_path = os.path.join(backend_root, recording_path)
+            if os.path.isfile(full_path):
+                try:
+                    os.remove(full_path)
+                except Exception:
+                    pass
+
+    # Also clear from in-memory jobs map if present.
+    with jobs_lock:
+        jobs.pop(job_id, None)
+
+    return removed

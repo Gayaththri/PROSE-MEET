@@ -1,0 +1,6 @@
+{
+  "run_name": "gap_eval_run_01",
+  "data": "data/eval_dataset.csv",
+  "model_dir": "models",
+  "log_path": "data/experiments/runs.jsonl"
+}

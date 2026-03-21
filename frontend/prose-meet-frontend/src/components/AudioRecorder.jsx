@@ -31,14 +31,18 @@ function AudioRecorder({ onJobCreated }) {
       setIsStartingJob(true);
 
       try {
-        // Send audio to backend bafor ckground job
-        const response = await runGap1(audioBlob);
+        const fullResponse = await runGap1(audioBlob);
 
-        if (!response?.job_id) {
+        if (!fullResponse?.job_id) {
           throw new Error("No job_id returned from backend");
         }
 
-        onJobCreated(response.job_id);
+        onJobCreated({
+          fullJobId: fullResponse.job_id,
+          previewJobId: null,
+          previewEnabled: false,
+          previewSeconds: null,
+        });
       } catch (err) {
         console.error(err);
         alert("Failed to start background processing");
@@ -92,7 +96,7 @@ function AudioRecorder({ onJobCreated }) {
       )}
 
       {isRecording && (
-        <>
+        <div className="saas-record-controls">
           <button
             type="button"
             onClick={togglePause}
@@ -107,7 +111,7 @@ function AudioRecorder({ onJobCreated }) {
           >
             ⏹ Stop
           </button>
-        </>
+        </div>
       )}
 
       {isStartingJob && (

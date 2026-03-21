@@ -1,16 +1,41 @@
-# React + Vite
+# PROSE-MEET Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React + Vite UI for the PROSE-MEET meeting pipeline: upload or record audio, run Gap 1 processing, and view transcripts, summaries, highlights, and importance.
 
-Currently, two official plugins are available:
+## Quick start
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+npm run dev
+```
 
-## React Compiler
+Open the URL shown (e.g. http://localhost:5173). The app talks to the backend API; start the backend first (see root [README](../../README.md)).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Configuring the API base URL
 
-## Expanding the ESLint configuration
+By default the app uses **http://127.0.0.1:8000** as the backend API base URL. To override (e.g. for a different host or port):
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- **Development:** Create `.env.local` in this directory:
+  ```env
+  VITE_API_BASE_URL=http://127.0.0.1:8000
+  ```
+  Change the value to your backend URL. Vite only exposes variables prefixed with `VITE_`.
+
+- **Production build:** Set `VITE_API_BASE_URL` in the environment when running `npm run build`, or in your CI/deploy config, e.g.:
+  ```bash
+  VITE_API_BASE_URL=https://api.example.com npm run build
+  ```
+
+## Scripts
+
+- `npm run dev` — Start dev server with HMR.
+- `npm run build` — Production build (output in `dist/`).
+- `npm run preview` — Preview the production build locally.
+- `npm run lint` — Run ESLint.
+
+## Stack
+
+- React 19
+- Vite 7
+- Tailwind CSS
+- Axios for API calls
