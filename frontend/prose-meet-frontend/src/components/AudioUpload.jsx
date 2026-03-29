@@ -1,3 +1,4 @@
+// Audio upload component for local file submissions.
 import { useRef, useState } from "react";
 import { runGap1, runGap1WithOptions } from "../api/gap1";
 import Modal from "./Modal";
@@ -101,7 +102,7 @@ export default function AudioUpload({ onJobCreated }) {
         <div className="saas-modal-copy">
           <p className="saas-modal-eyebrow">Upload audio or video</p>
           <p className="saas-modal-description">
-            Supported formats include MP3, WAV, M4A, AAC, MP4, AVI, and WebM.
+            Supported formats: all audio files, plus MP4, WebM, and AVI video files.
           </p>
         </div>
 
@@ -125,7 +126,7 @@ export default function AudioUpload({ onJobCreated }) {
           >
             <p className="saas-dropzone-title">Drop your file here</p>
             <p className="saas-dropzone-hint">
-              or click to browse — MP3, WAV, M4A, AAC, MP4, AVI
+              or click to browse - audio files, MP4, WebM, AVI
             </p>
             <button
               type="button"
@@ -175,7 +176,7 @@ export default function AudioUpload({ onJobCreated }) {
               disabled={loading}
               className={`action-button saas-btn-primary saas-btn-submit ${loading ? "is-loading" : ""}`}
             >
-              {loading ? "Starting…" : quickPreview ? "Start preview + full analysis" : "Start analysis"}
+              {loading ? "Starting..." : quickPreview ? "Start preview + full analysis" : "Start analysis"}
             </button>
           </div>
         )}

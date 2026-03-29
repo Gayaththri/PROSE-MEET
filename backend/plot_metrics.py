@@ -1,3 +1,5 @@
+"""Visualize experiment metrics from saved result files."""
+
 import argparse
 import json
 import os

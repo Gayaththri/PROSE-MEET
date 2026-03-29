@@ -1,19 +1,17 @@
+// Sidebar navigation for primary application sections.
 import brandLogo from "../assets/brand-logo.png";
 import {
   HomeIcon as HomeIconOutline,
   CalendarDaysIcon as CalendarDaysIconOutline,
-  ArrowUpTrayIcon as ArrowUpTrayIconOutline,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeIconSolid,
   CalendarDaysIcon as CalendarDaysIconSolid,
-  ArrowUpTrayIcon as ArrowUpTrayIconSolid,
 } from "@heroicons/react/24/solid";
 
 const NAV_ITEMS = [
   { id: "home", label: "Home", IconOutline: HomeIconOutline, IconSolid: HomeIconSolid },
   { id: "meetings", label: "Meetings", IconOutline: CalendarDaysIconOutline, IconSolid: CalendarDaysIconSolid },
-  { id: "uploads", label: "Uploads", IconOutline: ArrowUpTrayIconOutline, IconSolid: ArrowUpTrayIconSolid },
 ];
 
 function NavLink({ item, activeId, onSelect }) {
@@ -75,7 +73,7 @@ export default function Sidebar({ activeId = "home", onSelect }) {
       <div className="sidebar-footer">
         <p className="sidebar-footer-title">Always-on processing</p>
         <p className="sidebar-footer-copy">
-          Start from Home, then track long-running jobs without leaving the app.
+          Start from Home, then track long running jobs without leaving the app.
         </p>
       </div>
     </aside>

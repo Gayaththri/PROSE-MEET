@@ -1,5 +1,5 @@
 /**
- * Highest-importance moments as a vertical action-items list (one row each).
+ * Highest-importance moments as a vertical action items list (one row each).
  * Icons reflect inferred type from segment text + importance_reasons.
  */
 import { useMemo } from "react";
@@ -185,7 +185,7 @@ function isActionableSegment(seg) {
   return containsActionKeyword(seg) && semanticScore(seg) >= 0.45 && finalImportanceScore(seg) >= 0.45;
 }
 
-export function getTopImportanceSegments(transcript, limit = DEFAULT_LIMIT) {
+function getTopImportanceSegments(transcript, limit = DEFAULT_LIMIT) {
   if (!Array.isArray(transcript) || transcript.length === 0) return [];
 
   const candidates = transcript.filter((seg) => !isNonSubstantiveSegment(seg));
@@ -235,14 +235,18 @@ export default function HighestImportanceActionBoard({
   segments = [],
   emptyMessage = "No action items yet — scores appear after analysis completes.",
 }) {
+  const prioritizedSegments = useMemo(
+    () => getTopImportanceSegments(segments, DEFAULT_LIMIT),
+    [segments],
+  );
   const rows = useMemo(
     () =>
-      segments.map((seg, idx) => {
+      prioritizedSegments.map((seg, idx) => {
         const meta = getActionIconMeta(seg);
         const id = seg.segment_id ?? `seg-${idx}-${seg.start}-${seg.end}`;
         return { seg, meta, id };
       }),
-    [segments],
+    [prioritizedSegments],
   );
 
   if (!rows.length) {

@@ -1,3 +1,4 @@
+// ESLint configuration for the frontend project.
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'

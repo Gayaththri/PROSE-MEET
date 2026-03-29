@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="JSON file storage">
+  <title>JSON files data/meetings</title>
+  <rect width="128" height="128" rx="12" fill="#1e293b"/>
+  <text x="64" y="44" text-anchor="middle" fill="#f8fafc" font-family="Consolas,monospace" font-size="22" font-weight="700">{ }</text>
+  <text x="64" y="72" text-anchor="middle" fill="#94a3b8" font-family="system-ui,sans-serif" font-size="11">.json</text>
+  <text x="64" y="92" text-anchor="middle" fill="#64748b" font-family="system-ui,sans-serif" font-size="9">data/meetings</text>
+</svg>

@@ -1,15 +1,17 @@
 """
-Gap 2: Domain detection + domain-adaptive scoring.
-Returns predicted_domain, confidence, adaptation strategy, and domain-driven score adaptation.
+Detects meeting domain and applies domain-adaptive reweighting to importance scores for more context-aware highlights and summaries.
 """
 import math
+import os
 import re
 from typing import Dict, Any, List
 
 # Domain keywords (lowercase) – presence boosts that domain's score
 DOMAIN_SIGNALS = {
     "corporate": [
-        "agenda", "meeting", "minutes", "project", "plan", "discuss", "decision",
+        # Note: "meeting" is omitted — it appears in corporate, academic, and medical
+        # recordings alike and skews lexical scores toward Corporate.
+        "agenda", "minutes", "project", "plan", "discuss", "decision",
         "stakeholder", "team", "action", "follow up", "schedule", "deadline",
         "review", "kickoff", "manager", "goal", "objective", "budget", "quarter",
         "kpi", "roi", "client", "customer", "contract", "proposal", "presentation",
@@ -20,6 +22,11 @@ DOMAIN_SIGNALS = {
         "conference", "citation", "methodology", "hypothesis", "findings",
         "literature", "seminar", "course", "assignment", "grading", "student",
         "professor", "department", "publication", "journal", "peer review",
+        # Research-lab / speech & language meetings (e.g. ICSI-style transcripts)
+        "transcript", "annotation", "annotations", "corpus", "dataset",
+        "utterance", "discourse", "prosody", "alignment", "recognizer",
+        "recognition", "speaker", "channel", "overlap", "segment", "lattice",
+        "phoneme", "encoding", "xml",
     ],
     "medical": [
         "patient", "treatment", "diagnosis", "symptoms", "clinical", "therapy",
@@ -66,21 +73,12 @@ def _text_from_segments(segments: List[Dict[str, Any]]) -> str:
     return " ".join((s.get("text") or "").strip() for s in segments).lower()
 
 
-def detect_domain(
+def _detect_domain_keyword(
     transcript: List[Dict[str, Any]],
     summary: str = None,
     speaker_summaries: List[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    Predict meeting domain from transcript and optional summary text.
-    Returns:
-        {
-            "predicted_domain": "corporate" | "academic" | "medical",
-            "confidence": float in [0, 1],
-            "adaptation_strategy": str,  # e.g. "Decision-Focused"
-            "domain_label": str,         # e.g. "Corporate" (for display)
-        }
-    """
+    """Lexical keyword baseline (no neural encoder)."""
     text = _text_from_segments(transcript)
     if summary:
         text += " " + (summary or "").strip().lower()
@@ -94,6 +92,7 @@ def detect_domain(
             "confidence": 0.5,
             "adaptation_strategy": DEFAULT_STRATEGY,
             "domain_label": DOMAIN_LABELS.get(DEFAULT_DOMAIN, (DEFAULT_DOMAIN.title(), DEFAULT_STRATEGY))[0],
+            "domain_method": "keyword",
         }
 
     scores = {}
@@ -109,6 +108,7 @@ def detect_domain(
             "confidence": DEFAULT_CONFIDENCE,
             "adaptation_strategy": strategy,
             "domain_label": label,
+            "domain_method": "keyword",
         }
 
     best_domain = max(scores, key=scores.get)
@@ -122,7 +122,50 @@ def detect_domain(
         "confidence": round(confidence, 2),
         "adaptation_strategy": strategy,
         "domain_label": label,
+        "domain_method": "keyword",
     }
+
+
+def detect_domain(
+    transcript: List[Dict[str, Any]],
+    summary: str = None,
+    speaker_summaries: List[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """
+    Predict meeting domain from transcript and optional summary text.
+
+    Default: **self-supervised zero-shot** — frozen pretrained sentence encoder
+    (MiniLM / Sentence-BERT family) + prototype similarity; no fine-tuning on
+    meeting-domain labels. Set PROSE_DOMAIN_METHOD=keyword for lexical baseline
+    only. If sentence-transformers is unavailable, falls back to keyword matching.
+
+    Returns:
+        {
+            "predicted_domain": "corporate" | "academic" | "medical",
+            "confidence": float in [0, 1],
+            "adaptation_strategy": str,
+            "domain_label": str,
+            "domain_method": "keyword" | "ssl_zero_shot",
+            optional: "ssl_model", "ssl_domain_scores" (ssl path only)
+        }
+    """
+    method = (os.getenv("PROSE_DOMAIN_METHOD") or "ssl_zero_shot").strip().lower()
+    if method in ("keyword", "lexical"):
+        return _detect_domain_keyword(
+            transcript, summary=summary, speaker_summaries=speaker_summaries
+        )
+    try:
+        from .ssl_zero_shot_domain import detect_domain_ssl_zero_shot
+
+        return detect_domain_ssl_zero_shot(
+            transcript=transcript,
+            summary=summary,
+            speaker_summaries=speaker_summaries,
+        )
+    except Exception:
+        return _detect_domain_keyword(
+            transcript, summary=summary, speaker_summaries=speaker_summaries
+        )
 
 
 def get_domain_focus_keywords(domain_result: Dict[str, Any]) -> List[str]:
@@ -159,8 +202,10 @@ def apply_domain_adaptation(
     """
     Adapt importance scores using domain focus cues so Gap 2 influences Gap 1 output.
 
-    Keeps the original score in `base_importance_score` and writes adapted score to
-    `importance_score` for downstream ranking/summaries/highlights.
+    With SSL zero-shot domain detection, uses **prototype embedding similarity** per
+    segment (self-supervised encoder, no keyword lists). Otherwise uses lexical
+    keyword overlap. Keeps the original score in `base_importance_score` and writes
+    adapted score to `importance_score`.
     """
     if not ranked_segments:
         return []
@@ -177,8 +222,18 @@ def apply_domain_adaptation(
     numeric_bonus = float(profile.get("numeric_bonus", 0.03))
     max_domain_boost = float(profile.get("max_domain_boost", 1.1))
 
+    use_ssl = (domain_result or {}).get("domain_method") == "ssl_zero_shot"
+    ssl_rel: List[float] | None = None
+    if use_ssl:
+        try:
+            from .ssl_zero_shot_domain import batch_segment_prototype_relevance
+
+            ssl_rel = batch_segment_prototype_relevance(ranked_segments, domain)
+        except Exception:
+            use_ssl = False
+
     adapted = []
-    for seg in ranked_segments:
+    for i, seg in enumerate(ranked_segments):
         text = (seg.get("text") or "").strip().lower()
         # For Gap-2 ranking, domain adaptation must start from the current
         # `importance_score` (which may already include supervised fusion + penalties).
@@ -192,9 +247,13 @@ def apply_domain_adaptation(
             else ranking_base_score
         )
 
-        kw_hits = sum(1 for kw in focus_keywords if kw in text)
-        # Softer multi-hit impact for better generalisation.
-        keyword_boost = keyword_weight * math.log1p(kw_hits)
+        if use_ssl and ssl_rel is not None:
+            rel = float(ssl_rel[i])
+            kw_hits = int(round(rel * 10.0))
+            keyword_boost = keyword_weight * math.log1p(rel * 8.0)
+        else:
+            kw_hits = sum(1 for kw in focus_keywords if kw in text)
+            keyword_boost = keyword_weight * math.log1p(kw_hits)
 
         number_boost = 0.0
         if re.search(r"\b\d+(?:[\.,]\d+)?\b", text):
@@ -206,7 +265,10 @@ def apply_domain_adaptation(
         adapted_score = ranking_base_score * (1.0 + 0.3 * domain_boost * confidence)
 
         # Penalize domain-irrelevant segments (requested).
-        if kw_hits == 0:
+        if use_ssl and ssl_rel is not None:
+            if ssl_rel[i] < 0.05:
+                adapted_score *= 0.95
+        elif kw_hits == 0:
             adapted_score *= 0.95
 
         # Safety blending to keep adaptation impact controlled.
@@ -221,11 +283,23 @@ def apply_domain_adaptation(
         seg_out = seg.copy()
         seg_out["base_importance_score"] = float(analysis_base_score)
         seg_out["domain_relevance_hits"] = kw_hits
+        if use_ssl and ssl_rel is not None:
+            seg_out["domain_ssl_relevance"] = round(float(ssl_rel[i]), 4)
         seg_out["domain_score_boost"] = round(domain_boost * confidence, 4)
         seg_out["importance_score"] = float(adapted_score)
 
         reasons = list(seg_out.get("importance_reasons") or [])
-        if kw_hits > 0:
+        if use_ssl and ssl_rel is not None:
+            r = float(ssl_rel[i])
+            if r >= 0.05:
+                reasons.append(
+                    f"SSL zero-shot scaling: semantic match to {domain} prototype (relevance={r:.2f})."
+                )
+            else:
+                reasons.append(
+                    "SSL zero-shot penalty: low semantic match to domain prototype; score down-weighted."
+                )
+        elif kw_hits > 0:
             reasons.append(
                 f"Domain-adaptive scaling: {domain} keywords matched ({kw_hits} hit(s)); multiplicative boost applied."
             )

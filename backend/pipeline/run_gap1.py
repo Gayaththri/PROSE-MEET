@@ -1,14 +1,15 @@
+"""
+Runs the main Gap 1 meeting pipeline end-to-end with progress updates: audio preprocessing, ASR+prosody, alignment, importance scoring, domain adaptation, highlights, speaker insights, and summary output.
+"""
 import concurrent.futures
-import os
 
 from .audio import preprocess_audio
-from .asr import transcribe_audio, uses_cuda
+from .asr import transcribe_audio
 from .prosody import extract_prosody
 from .alignment import align_text_prosody
 from .importance import compute_importance
 from .summary import generate_summary, generate_speaker_summaries, top_substantive_highlights
-from .speakers import compute_speaker_contribution, compute_speaker_contribution_from_labels, infer_and_apply_speaker_names
-from .diarization import diarize_audio, assign_speakers_to_segments
+from .speakers import compute_speaker_contribution
 from .domain import (
     detect_domain,
     apply_domain_adaptation,
@@ -16,19 +17,7 @@ from .domain import (
     get_domain_importance_threshold,
 )
 from .timing import TimingCollector, timed_stage
-
-
-class JobCancelledError(RuntimeError):
-    pass
-
-
-def _parallelize_diarization() -> bool:
-    override = os.getenv("PIPELINE_PARALLEL_DIARIZATION", "").lower()
-    if override in ("1", "true", "yes"):
-        return True
-    if override in ("0", "false", "no"):
-        return False
-    return not uses_cuda()
+from .job_control import JobCancelledError
 
 
 def _check_cancel(cancel_checker):
@@ -84,10 +73,7 @@ def run_gap1(
     cancel_checker=None,
     result_metadata=None,
 ) -> dict:
-    """
-    Runs Gap 1: Prosody-Aware Importance Detection.
-    Speakers are identified by voice (diarization); names are inferred from transcript when present (e.g. "My name is Rose").
-    """
+   
     _emit_progress(
         progress_callback,
         stage="preparing_audio",
@@ -95,10 +81,11 @@ def run_gap1(
         progress=0.08,
     )
     _check_cancel(cancel_checker)
-    # Preprocess audio once (mono, 16 kHz, normalised) – used for diarization and prosody
+    # Preprocess audio once (mono, 16 kHz, normalised) for prosody extraction
     with timed_stage(timing_collector, "preprocess_audio"):
         audio, sr = preprocess_audio(audio_path)
     duration_seconds = float(len(audio) / sr) if sr > 0 and len(audio) > 0 else 0.0
+    _check_cancel(cancel_checker)
 
     # Run ASR and prosody extraction in parallel to reduce total time
     _emit_progress(
@@ -107,11 +94,40 @@ def run_gap1(
         stage_label="Transcribing meeting",
         progress=0.26,
     )
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        future_asr = executor.submit(transcribe_audio, audio_path, "en", timing_collector)
-        future_prosody = executor.submit(extract_prosody, audio, sr, timing_collector)
+    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+    hard_shutdown = False
+    try:
+        future_asr = executor.submit(
+            transcribe_audio, audio_path, "en", timing_collector, cancel_checker
+        )
+        future_prosody = executor.submit(
+            extract_prosody, audio, sr, timing_collector, cancel_checker
+        )
+        pending = {future_asr, future_prosody}
+        while pending:
+            done, pending = concurrent.futures.wait(
+                pending,
+                timeout=0.5,
+                return_when=concurrent.futures.FIRST_COMPLETED,
+            )
+            try:
+                _check_cancel(cancel_checker)
+            except JobCancelledError:
+                hard_shutdown = True
+                executor.shutdown(wait=False)
+                raise
+            for f in done:
+                try:
+                    f.result()
+                except JobCancelledError:
+                    hard_shutdown = True
+                    executor.shutdown(wait=False)
+                    raise
         segments = future_asr.result()
         prosody = future_prosody.result()
+    finally:
+        if not hard_shutdown:
+            executor.shutdown(wait=True)
     _check_cancel(cancel_checker)
 
     # Align text with prosody
@@ -123,6 +139,7 @@ def run_gap1(
     )
     with timed_stage(timing_collector, "align_text_prosody"):
         aligned = align_text_prosody(segments, prosody, sr=sr)
+    _check_cancel(cancel_checker)
 
     # Gap 1 base importance scoring (prosody + semantic fusion)
     _emit_progress(
@@ -134,25 +151,6 @@ def run_gap1(
     with timed_stage(timing_collector, "compute_importance"):
         ranked_base = compute_importance(aligned)
     _check_cancel(cancel_checker)
-
-    parallelize_diarization = _parallelize_diarization()
-    if timing_collector is not None:
-        timing_collector.set_metadata("parallel_diarization", parallelize_diarization)
-
-    diarization_segments = None
-    diarization_future = None
-    diarization_executor = None
-    if parallelize_diarization:
-        diarization_executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-        diarization_future = diarization_executor.submit(
-            diarize_audio,
-            audio_path=audio_path,
-            waveform=audio,
-            sample_rate=sr,
-            min_speakers=2,
-            max_speakers=20,
-            timing_collector=timing_collector,
-        )
 
     _emit_progress(
         progress_callback,
@@ -166,6 +164,7 @@ def run_gap1(
             summary=None,
             speaker_summaries=None,
         )
+    _check_cancel(cancel_checker)
     with timed_stage(timing_collector, "apply_domain_adaptation"):
         ranked = apply_domain_adaptation(ranked_base, domain_result)
     focus_keywords = get_domain_focus_keywords(domain_result)
@@ -217,23 +216,6 @@ def run_gap1(
     )
     _check_cancel(cancel_checker)
 
-    if diarization_future is not None:
-        diarization_segments = diarization_future.result()
-        diarization_executor.shutdown(wait=True)
-    else:
-        with timed_stage(timing_collector, "diarization_decode"):
-            diarization_segments = diarize_audio(
-                audio_path=audio_path,
-                waveform=audio,
-                sample_rate=sr,
-                min_speakers=2,
-                max_speakers=20,
-                timing_collector=timing_collector,
-            )
-    unique_diarization_speakers = (
-        len(set(sp for _, _, sp in diarization_segments))
-        if diarization_segments else 0
-    )
     _emit_progress(
         progress_callback,
         stage="finalizing_insights",
@@ -241,11 +223,7 @@ def run_gap1(
         progress=0.92,
     )
     with timed_stage(timing_collector, "speaker_assignment"):
-        if diarization_segments and unique_diarization_speakers >= 2:
-            assign_speakers_to_segments(ranked, diarization_segments)
-            speakers = compute_speaker_contribution_from_labels(ranked)
-        else:
-            speakers = compute_speaker_contribution(ranked)
+        speakers = compute_speaker_contribution(ranked)
     _check_cancel(cancel_checker)
 
     # Transcript in chronological order (includes domain-adapted importance fields).
@@ -265,9 +243,7 @@ def run_gap1(
             top_ratio=1.0,
             max_segments_per_speaker=80,
         )
-    # Infer names from transcript (e.g. "My name is Rose", "I'm Alima") and replace Speaker_1, Speaker_2, ...
-    with timed_stage(timing_collector, "speaker_name_inference"):
-        infer_and_apply_speaker_names(ranked, result["speaker_summaries"], result["speakers"])
+    _check_cancel(cancel_checker)
     with timed_stage(timing_collector, "summary_generation"):
         result["transcript"] = sorted(result["transcript"], key=lambda x: x["start"])
         result["summary"] = generate_summary(result["transcript"], top_ratio=1.0, max_segments=150)

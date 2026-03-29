@@ -1,5 +1,5 @@
 /**
- * Prosody Graph Panel — Acoustic Analysis
+ * Prosody Graph Panel - Acoustic Analysis
  * Shows pitch and energy over time so examiners can see the raw signal processing.
  */
 import { useMemo } from "react";
@@ -27,7 +27,6 @@ function buildAcousticSeries(transcript) {
   );
   return chronological.map((seg) => {
     const start = typeof seg.start === "number" ? seg.start : 0;
-    const end = typeof seg.end === "number" ? seg.end : start;
     // Align chart points with the same "start time" convention used by the transcript/timeline.
     // (Timeline detail uses [starts - ends]; this keeps x-axis times consistent.)
     const time = start;
@@ -120,16 +119,16 @@ export default function AcousticAnalysisPanel({ transcript = [], loading = false
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="time"
-                tickFormatter={(v) => `${v.toFixed(0)}s`}
+                tickFormatter={(v) => (Number.isFinite(v) ? `${v.toFixed(0)}s` : "")}
                 fontSize={11}
               />
               <YAxis
-                tickFormatter={(v) => v.toFixed(0)}
+                tickFormatter={(v) => (Number.isFinite(v) ? v.toFixed(0) : "")}
                 fontSize={11}
               />
               <Tooltip
-                labelFormatter={(v) => `${v.toFixed(1)}s`}
-                formatter={(value) => value.toFixed(2)}
+                labelFormatter={(v) => (Number.isFinite(v) ? `${v.toFixed(1)}s` : "")}
+                formatter={(value) => (Number.isFinite(value) ? value.toFixed(2) : "—")}
               />
               <Line
                 type="monotone"
@@ -156,16 +155,16 @@ export default function AcousticAnalysisPanel({ transcript = [], loading = false
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis
                 dataKey="time"
-                tickFormatter={(v) => `${v.toFixed(0)}s`}
+                tickFormatter={(v) => (Number.isFinite(v) ? `${v.toFixed(0)}s` : "")}
                 fontSize={11}
               />
               <YAxis
-                tickFormatter={(v) => v.toFixed(3)}
+                tickFormatter={(v) => (Number.isFinite(v) ? v.toFixed(3) : "")}
                 fontSize={11}
               />
               <Tooltip
-                labelFormatter={(v) => `${v.toFixed(1)}s`}
-                formatter={(value) => value.toFixed(3)}
+                labelFormatter={(v) => (Number.isFinite(v) ? `${v.toFixed(1)}s` : "")}
+                formatter={(value) => (Number.isFinite(value) ? value.toFixed(3) : "—")}
               />
               <Line
                 type="monotone"

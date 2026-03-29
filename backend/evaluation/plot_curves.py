@@ -1,3 +1,5 @@
+"""Plot evaluation curves from benchmark result files."""
+
 import argparse
 import csv
 import json

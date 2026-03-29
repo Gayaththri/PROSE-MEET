@@ -1,3 +1,4 @@
+/* Global styles for the frontend application. */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -76,7 +77,7 @@ body,
 }
 
 /* -------------------------
-   App layout — sidebar + content
+   App layout sidebar + content
 -------------------------- */
 
 .app-layout {
@@ -91,7 +92,7 @@ body,
 }
 
 /* -------------------------
-   Left sidebar (Fireflies-style)
+   Left sidebar
 -------------------------- */
 
 .sidebar {
@@ -254,7 +255,7 @@ body,
 }
 
 /* -------------------------
-   Main content area (right of sidebar)
+   Main content area
 -------------------------- */
 
 .app-content {
@@ -271,7 +272,6 @@ body,
   overflow-y: auto;
   overflow-x: clip;
   -webkit-overflow-scrolling: touch;
-  /* Right edge is usually flush with the viewport; left inset handled by the sidebar */
   padding-right: env(safe-area-inset-right, 0px);
   box-sizing: border-box;
 }
@@ -374,7 +374,7 @@ body,
 }
 
 /* -------------------------
-   Hero — Otter/Read style value prop + CTA
+   Hero prop + CTA
 -------------------------- */
 
 .saas-hero {
@@ -435,7 +435,7 @@ body,
 }
 
 .saas-processing-illustration::before {
-  content: "✦";
+  content: "\2726";
   font-size: 28px;
   color: #169976;
 }
@@ -603,7 +603,7 @@ body,
 }
 
 /* -------------------------
-   CTA card — “Start a new meeting”
+   CTA card Start a new meeting
 -------------------------- */
 
 .saas-cta-card {
@@ -718,7 +718,7 @@ body,
 }
 
 /* -------------------------
-   Meetings list (saved meetings tab)
+   Saved Meetings list
 -------------------------- */
 
 .saas-meetings-list {
@@ -868,7 +868,7 @@ body,
 }
 
 /* -------------------------
-   Results — dashboard layout
+   Results dashboard layout
 -------------------------- */
 
 .saas-results {
@@ -892,7 +892,7 @@ body,
   margin: 6px 0 0;
 }
 
-/* Meeting Overview Panel (Gap 2 — first thing examiner sees) */
+/* Meeting Overview Panel */
 .saas-overview-panel {
   background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
   border-radius: 16px;
@@ -1285,7 +1285,7 @@ body,
   margin-bottom: 2px;
 }
 
-/* Action items list (highest importance, stacked) */
+/* Action items list */
 .saas-action-items-card {
   margin-bottom: 4px;
 }
@@ -1452,7 +1452,7 @@ body,
   grid-column: 1 / -1;
 }
 
-/* Prosody Graph Panel – Acoustic Analysis */
+/* Prosody Graph Panel Acoustic Analysis */
 .saas-acoustic-card {
   margin-top: 4px;
   margin-bottom: 4px;
@@ -1957,7 +1957,7 @@ body,
 
 
 /* -------------------------
-   Buttons (used by AudioUpload, AudioRecorder)
+   Buttons
 -------------------------- */
 
 .action-button {
@@ -3639,7 +3639,7 @@ select {
   max-width: 100%;
 }
 
-/* Landscape / short screens: reduce forced vertical min-heights */
+/* Landscape / short screens: reduce forced vertical min heights */
 @media (max-height: 520px) and (orientation: landscape) {
   .saas-processing-screen,
   .saas-hero-centered {

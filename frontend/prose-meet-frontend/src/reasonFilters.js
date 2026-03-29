@@ -1,3 +1,4 @@
+// Utilities for filtering and grouping reason labels.
 const HIDDEN_REASON_PATTERNS = [
   /longer statement length suggests substantive content\.?/i,
   /decision\/planning keywords detected/i,

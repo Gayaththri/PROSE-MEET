@@ -1,5 +1,7 @@
+"""
+Generates structured meeting summaries, speaker summaries, and substantive highlights by filtering low-value ASR text and selecting high-relevance segments with keyword and importance scoring heuristics.
+"""
 import re
-from .ai_summary import try_generate_ai_summary
 
 # Backchannels and very short phrases to exclude from summary/highlights (prosody often ranks them high)
 _BACKCHANNELS = frozenset(
@@ -229,7 +231,7 @@ def _infer_owner(seg, known_people):
         if re.search(rf"\b{re.escape(person.lower())}\b", text_lower):
             return person
     speaker = (seg.get("speaker") or "").strip()
-    if speaker and not _GENERIC_SPEAKER_RE.match(speaker):
+    if speaker:
         return speaker
     return "Not specified"
 
@@ -513,9 +515,6 @@ def generate_summary(ranked_segments, top_ratio: float = 1.0, max_segments: int 
         k = min(max_segments, max(1, int(len(segments) * top_ratio)))
         segments = segments[:k]
 
-    ai_summary = try_generate_ai_summary(segments)
-    if ai_summary:
-        return ai_summary
     return _build_full_summary(segments)
 
 

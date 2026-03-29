@@ -1,3 +1,5 @@
+"""Evaluate GAP2 using zero-shot domain labeling outputs."""
+
 import argparse
 import csv
 import json

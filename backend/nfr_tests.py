@@ -1,3 +1,5 @@
+"""Run non-functional requirement checks for the backend."""
+
 import argparse
 import csv
 import os

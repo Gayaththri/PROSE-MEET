@@ -1,3 +1,5 @@
+"""Orchestrate execution of all configured backend experiments."""
+
 import argparse
 import os
 import shutil

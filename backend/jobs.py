@@ -1,3 +1,5 @@
+"""In-memory job lifecycle management for async tasks."""
+
 import copy
 import json
 import os
@@ -9,6 +11,8 @@ jobs = {}
 jobs_lock = threading.Lock()
 
 MEETINGS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "meetings")
+_BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+_RECORDINGS_ROOT = os.path.abspath(os.path.join(_BACKEND_ROOT, "data", "recordings"))
 
 
 def _use_postgres():
@@ -21,6 +25,23 @@ def _ensure_meetings_dir():
 
 def _now_iso():
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def resolve_recording_path(recording_path: str):
+    """
+    Resolve a stored recording path to an absolute path under data/recordings.
+    Returns None when path is empty, invalid, or outside the recordings root.
+    """
+    if not recording_path or not isinstance(recording_path, str):
+        return None
+    try:
+        candidate = os.path.abspath(os.path.join(_BACKEND_ROOT, recording_path))
+        common = os.path.commonpath([_RECORDINGS_ROOT, candidate])
+        if common != _RECORDINGS_ROOT:
+            return None
+        return candidate
+    except Exception:
+        return None
 
 
 def _create_job_state(
@@ -326,12 +347,12 @@ def delete_meeting(job_id: str):
                 removed = False
 
     # Best-effort cleanup of the original recording file (if we know it).
-    if result:
+    # Only remove the recording when meeting deletion succeeded.
+    if removed and result:
         recording_path = result.get("recording_path")
         if recording_path:
-            backend_root = os.path.join(os.path.dirname(__file__), "..")
-            full_path = os.path.join(backend_root, recording_path)
-            if os.path.isfile(full_path):
+            full_path = resolve_recording_path(recording_path)
+            if full_path and os.path.isfile(full_path):
                 try:
                     os.remove(full_path)
                 except Exception:

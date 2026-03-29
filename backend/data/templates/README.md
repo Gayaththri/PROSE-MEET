@@ -2,6 +2,16 @@
 
 Minimal CSV and manifest layouts so new clones can run evaluation and `run_all_experiments.py` without creating everything by hand.
 
+## Two different “done”s (read this once)
+
+| | **App / demo** | **Thesis tables (F1, accuracy, etc.)** |
+|---|----------------|----------------------------------------|
+| **What it means** | You run PROSE-MEET on audio and the UI shows importance + domain. | You have **numbers** in your report from `evaluate_gaps.py` (and optionally `evaluate_gap2_zeroshot.py`). |
+| **What you need** | Working backend + upload. | A filled **`eval_dataset.csv`**: each row has **importance labels** (Gap 1); each **meeting** has **true domain** (Gap 2). Then run the eval scripts. |
+| **Gap 1 model** | Rules + prosody run without training. | Optional **supervised** model: train with `train_importance_model.py` on labelled CSV; otherwise report **rule-based** baseline only. |
+
+Without labelled rows + eval runs, the **code is still complete** — only the **measured metrics** for Chapter Results are missing (tables may show **"-"**).
+
 ## Contents
 
 - **eval_dataset_template.csv** — For Gap 1 (importance) and Gap 2 (domain) evaluation. Required columns: `text`, `label` (or `importance_label` / `important`). For domain: `meeting_id`, `true_domain` (or `domain`). Optional: `start`, `end`, `pitch_variance`, `mean_energy`, `pause_ratio`.

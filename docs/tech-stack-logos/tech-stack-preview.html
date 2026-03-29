@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PROSE-MEET — Technology stack (SVG preview)</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, Segoe UI, sans-serif; margin: 2rem; background: #f8fafc; color: #0f172a; }
+    h1 { font-size: 1.25rem; margin-bottom: 0.25rem; }
+    p.note { color: #64748b; font-size: 0.9rem; margin-top: 0; }
+    section { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 1.25rem; margin: 1.25rem 0; }
+    section h2 { font-size: 1rem; text-transform: uppercase; letter-spacing: 0.06em; color: #475569; margin: 0 0 1rem; }
+    .row { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; }
+    figure { margin: 0; text-align: center; width: 88px; }
+    figure img { width: 56px; height: 56px; object-fit: contain; display: block; margin: 0 auto 0.35rem; }
+    figcaption { font-size: 0.72rem; color: #334155; max-width: 88px; line-height: 1.2; }
+  </style>
+</head>
+<body>
+  <h1>PROSE-MEET — Figure 7.2.1 preview</h1>
+  <p class="note">SVG files live in this folder. Use in Word/PowerPoint via Insert → Pictures, or embed in draw.io.</p>
+
+  <section>
+    <h2>Presentation tier</h2>
+    <div class="row">
+      <figure><img src="react.svg" alt="" /><figcaption>React</figcaption></figure>
+      <figure><img src="vite.svg" alt="" /><figcaption>Vite</figcaption></figure>
+      <figure><img src="tailwind.svg" alt="" /><figcaption>Tailwind CSS</figcaption></figure>
+      <figure><img src="axios.svg" alt="" /><figcaption>Axios</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <h2>Application tier</h2>
+    <div class="row">
+      <figure><img src="fastapi.svg" alt="" /><figcaption>FastAPI</figcaption></figure>
+      <figure><img src="uvicorn.svg" alt="" /><figcaption>Uvicorn</figcaption></figure>
+      <figure><img src="python.svg" alt="" /><figcaption>Python</figcaption></figure>
+    </div>
+    <p class="note" style="margin-top:1rem;">Pipeline modules (ASR, prosody, etc.) are code — optional: add faster-whisper / Librosa icons from Devicon in the same way.</p>
+  </section>
+
+  <section>
+    <h2>Data tier</h2>
+    <div class="row">
+      <figure><img src="json-files.svg" alt="" /><figcaption>JSON files</figcaption></figure>
+      <figure><img src="postgresql.svg" alt="" /><figcaption>PostgreSQL (optional)</figcaption></figure>
+    </div>
+  </section>
+</body>
+</html>

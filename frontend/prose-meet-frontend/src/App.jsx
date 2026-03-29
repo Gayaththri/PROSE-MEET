@@ -1,12 +1,13 @@
+// Main application shell and routing view.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import MeetingInsights from "./components/MeetingInsights";
 import ProcessingStatusCard from "./components/ProcessingStatusCard";
 import HomeStartView from "./components/HomeStartView";
 import SavedMeetingsView from "./components/SavedMeetingsView";
-import UploadsView from "./components/UploadsView";
 import Modal from "./components/Modal";
 import {
+  API_BASE_URL,
   getMeetings,
   getMeetingResult,
   deleteMeeting,
@@ -15,10 +16,10 @@ import {
 } from "./api/gap1";
 
 const POLL_INTERVAL_MS = 1000;
+const MEETINGS_RETRY_DELAY_MS = 700;
 const VIEW_TITLES = {
   home: "Home",
   meetings: "Meetings",
-  uploads: "Uploads",
 };
 
 function buildQueuedStatus(overrides = {}) {
@@ -33,11 +34,24 @@ function buildQueuedStatus(overrides = {}) {
   };
 }
 
+function isTransientNetworkError(err) {
+  const code = err?.code || err?.cause?.code;
+  return (
+    code === "ECONNRESET" ||
+    code === "ERR_NETWORK" ||
+    code === "ECONNREFUSED" ||
+    code === "ETIMEDOUT"
+  );
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function App() {
   const [activeView, setActiveView] = useState("home");
   const [processingSession, setProcessingSession] = useState(null);
   const [savedResult, setSavedResult] = useState(null);
-  const [activeHomeResultMode, setActiveHomeResultMode] = useState("live");
   const [meetings, setMeetings] = useState([]);
   const [meetingsLoading, setMeetingsLoading] = useState(false);
   const [appNotice, setAppNotice] = useState(null);
@@ -180,19 +194,30 @@ function App() {
     [processingSession],
   );
 
-  const homeResult =
-    activeHomeResultMode === "saved"
-      ? savedResult
-      : liveResult || (!processingSession ? savedResult : null);
+  const homeResult = liveResult;
 
   const loadMeetings = useCallback(async () => {
     setMeetingsLoading(true);
     try {
-      const data = await getMeetings();
+      let data;
+      try {
+        data = await getMeetings();
+      } catch (err) {
+        if (!isTransientNetworkError(err)) throw err;
+        // Uvicorn reload briefly drops connections; retry once.
+        await wait(MEETINGS_RETRY_DELAY_MS);
+        data = await getMeetings();
+      }
       setMeetings(Array.isArray(data) ? data : []);
+      setAppNotice(null);
     } catch (err) {
       console.error("Failed to load meetings:", err);
       setMeetings([]);
+      setAppNotice({
+        type: "error",
+        title: "Backend unavailable",
+        body: `Could not connect to the API. Make sure the backend is running on ${API_BASE_URL}.`,
+      });
     } finally {
       setMeetingsLoading(false);
     }
@@ -249,7 +274,6 @@ function App() {
       const data = await getMeetingResult(id);
       if (data && !data.error && data.transcript) {
         setSavedResult(data);
-        setActiveHomeResultMode("live");
         setActiveView("meetings");
       } else {
         alert("Could not load that meeting.");
@@ -274,17 +298,15 @@ function App() {
       notificationSent: false,
     });
     setSavedResult(null);
-    setActiveHomeResultMode("live");
     setActiveView("home");
     setAppNotice(null);
     await requestNotificationPermission();
   }, [requestNotificationPermission]);
 
-  const handleCancelProcessing = useCallback(async () => {
+  const handleCancelProcessing = useCallback(() => {
     if (!processingSessionRef.current) return;
     const current = processingSessionRef.current;
     const jobIds = [current.previewJobId, current.fullJobId].filter(Boolean);
-    await Promise.allSettled(jobIds.map((jobId) => cancelJob(jobId)));
     setProcessingSession((prev) => {
       if (!prev) return prev;
       return {
@@ -305,6 +327,7 @@ function App() {
           : null,
       };
     });
+    void Promise.allSettled(jobIds.map((jobId) => cancelJob(jobId))).catch(() => {});
   }, []);
 
   const showCompactProcessing = Boolean(processingSession) && (activeView !== "home" || liveResult);
@@ -366,7 +389,7 @@ function App() {
                 onClick={() => setAppNotice(null)}
                 aria-label="Dismiss notice"
               >
-                ✕
+                x
               </button>
             </div>
           )}
@@ -378,7 +401,6 @@ function App() {
                 compact
                 onCancel={handleCancelProcessing}
                 onOpenLive={() => {
-                  setActiveHomeResultMode("live");
                   setActiveView("home");
                 }}
               />
@@ -405,25 +427,12 @@ function App() {
             )
           )}
 
-          {activeView === "uploads" && (
-            <UploadsView
-              processingSession={processingSession}
-              onCancel={handleCancelProcessing}
-              onOpenLive={() => {
-                setActiveHomeResultMode("live");
-                setActiveView("home");
-              }}
-            />
-          )}
-
           {activeView === "home" && showFullProcessing && (
             <section className="page-section saas-processing-screen">
               <ProcessingStatusCard
                 session={processingSession}
                 onCancel={handleCancelProcessing}
-                onOpenLive={() => {
-                  setActiveHomeResultMode("live");
-                }}
+                onOpenLive={() => setActiveView("home")}
               />
             </section>
           )}
@@ -435,12 +444,7 @@ function App() {
           {activeView === "home" && homeResult && (
             <MeetingInsights
               result={homeResult}
-              loading={meetingInsightsLoading && activeHomeResultMode === "live"}
-              onBack={
-                activeHomeResultMode === "saved"
-                  ? () => setActiveView("meetings")
-                  : undefined
-              }
+              loading={meetingInsightsLoading}
             />
           )}
         </main>

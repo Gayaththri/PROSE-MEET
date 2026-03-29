@@ -1,3 +1,4 @@
+// Shared page header for branding and controls.
 export default function PageHeader({
   eyebrow,
   title,

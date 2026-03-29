@@ -1,3 +1,4 @@
+// Home view shown before meeting processing starts.
 import AudioUpload from "./AudioUpload";
 import PageHeader from "./PageHeader";
 
@@ -16,8 +17,7 @@ export default function HomeStartView({ onJobCreated }) {
             <span className="hero-kicker">New analysis</span>
             <h2 className="hero-panel-title">Start a new meeting</h2>
             <p className="hero-panel-description">
-              Keep your workflow moving with uploads and saved sessions that
-              are ready to revisit later.
+              Start analysis from Home and revisit saved sessions anytime from Meetings.
             </p>
           </div>
 

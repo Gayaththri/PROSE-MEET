@@ -1,7 +1,9 @@
+"""
+Validates importance scoring, domain-adaptation ranking effects, keyword-focused highlights, and summary generation quality on representative transcript fixtures.
+"""
 import unittest
 import os
 import sys
-from unittest.mock import patch
 
 BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if BACKEND_DIR not in sys.path:
@@ -106,7 +108,7 @@ class ImportanceDomainTests(unittest.TestCase):
         self.assertIn("next meeting", out.lower())
         self.assertNotIn("1) Meeting objective", out)
 
-    def test_generate_summary_falls_back_when_ai_unavailable(self):
+    def test_generate_summary_short_input(self):
         ranked = [
             {
                 "text": "We are starting the kickoff meeting for a remote control project.",
@@ -121,8 +123,7 @@ class ImportanceDomainTests(unittest.TestCase):
                 "end": 5.0,
             },
         ]
-        with patch("pipeline.summary.try_generate_ai_summary", return_value=None):
-            out = generate_summary(ranked)
+        out = generate_summary(ranked)
         self.assertIn("kickoff meeting", out.lower())
         self.assertIn("next meeting", out.lower())
 

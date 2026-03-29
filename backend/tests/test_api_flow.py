@@ -1,3 +1,6 @@
+"""
+Tests core API job flow endpoints (queue/status/result/cancel) with mocked processing to verify response contracts and progress metadata behavior.
+"""
 import io
 import unittest
 import os

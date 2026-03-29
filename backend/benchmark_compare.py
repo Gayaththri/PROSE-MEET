@@ -1,3 +1,5 @@
+"""Compare benchmark outputs across experiment runs."""
+
 import argparse
 import json
 from typing import Dict

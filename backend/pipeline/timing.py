@@ -1,3 +1,6 @@
+"""
+Collects thread-safe per-stage pipeline timing metrics and provides helpers to snapshot, format, and log execution-time reports.
+"""
 from __future__ import annotations
 
 import copy

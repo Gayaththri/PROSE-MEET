@@ -1,3 +1,5 @@
+"""Validate dataset manifest files for required schema."""
+
 import argparse
 import csv
 import json

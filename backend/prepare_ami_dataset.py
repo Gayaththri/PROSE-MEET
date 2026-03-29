@@ -1,3 +1,5 @@
+"""Prepare AMI-derived data files for evaluation workflows."""
+
 import argparse
 import csv
 import json
@@ -14,21 +16,10 @@ from pipeline.prosody import extract_prosody
 NITE_NS = {"nite": "http://nite.sourceforge.net/"}
 
 
-def _meeting_domain(meeting_id: str) -> str:
-    # Project-level proxy mapping for Gap 2's three domains.
-    if meeting_id.startswith("ES"):
-        return "corporate"
-    if meeting_id.startswith("IS"):
-        return "academic"
-    if meeting_id.startswith("TS"):
-        return "medical"
-    if meeting_id.startswith("EN"):
-        return "academic"
-    if meeting_id.startswith("IB"):
-        return "corporate"
-    if meeting_id.startswith("IN"):
-        return "medical"
-    return "academic"
+def _meeting_domain(_meeting_id: str) -> str:
+    # AMI meetings are treated as a single domain (corporate-like) for labels;
+    # academic/medical come from other datasets.
+    return "corporate"
 
 
 def _clean_token(token: str) -> str:

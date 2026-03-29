@@ -1,3 +1,4 @@
+// Empty state placeholder for no meeting data.
 export default function EmptyState({ title, description, action = null, compact = false }) {
   return (
     <div className={`empty-state ${compact ? "empty-state-compact" : ""}`}>

@@ -1,3 +1,5 @@
+"""Audio preprocessing utilities for the pipeline."""
+
 import librosa
 import numpy as np
 import soundfile as sf
@@ -5,17 +7,7 @@ import soundfile as sf
 
 def preprocess_audio(audio_path: str, target_sr: int = 16000):
     """
-    Load and preprocess meeting audio.
-    
-    Steps:
-    - Load audio
-    - Convert to mono
-    - Resample to target sample rate
-    - Normalise amplitude
-    
-    Returns:
-    - audio (np.ndarray)
-    - sample_rate (int)
+    Loads meeting audio, converts it to mono 16 kHz, and normalizes amplitude for downstream ASR/prosody processing.
     """
 
     try:

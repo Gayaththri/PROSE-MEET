@@ -1,3 +1,4 @@
+// Status card showing processing progress and state.
 const PROCESS_STEPS = [
   { id: "preparing_audio", label: "Preparing audio", matches: ["queued", "starting", "preparing_audio"] },
   { id: "transcribing", label: "Transcribing", matches: ["transcribing", "aligning_transcript"] },
@@ -8,7 +9,7 @@ const PROCESS_STEPS = [
 ];
 
 function formatEta(seconds) {
-  if (seconds == null || Number.isNaN(seconds)) return "Calculating…";
+  if (seconds == null || Number.isNaN(seconds)) return "Calculating...";
   const total = Math.max(0, Math.round(seconds));
   const minutes = Math.floor(total / 60);
   const secs = total % 60;
@@ -38,9 +39,11 @@ export default function ProcessingStatusCard({
   const stage = fullStatus.stage || "queued";
   const activeStepIndex = getActiveStepIndex(stage);
   const fullDone = ["completed", "failed", "cancelled"].includes(fullStatus.status);
+  const fullCancelling = fullStatus.status === "cancelling";
   const previewEnabled = Boolean(session.previewJobId);
   const previewReady = previewStatus.status === "completed";
-  const previewRunning = previewEnabled && !["completed", "failed", "cancelled"].includes(previewStatus.status);
+  const previewRunning =
+    previewEnabled && !["completed", "failed", "cancelled", "cancelling"].includes(previewStatus.status);
   const hasLivePreview = Boolean(session.previewResult || session.partialResult || session.fullResult);
 
   if (compact) {
@@ -48,14 +51,18 @@ export default function ProcessingStatusCard({
       <div className="saas-processing-banner">
         <div className="saas-processing-banner-main">
           <p className="saas-processing-banner-title">
-            {fullDone ? "Meeting analysis updated" : fullStatus.stage_label || "Meeting analysis in progress"}
+            {fullDone
+              ? "Meeting analysis updated"
+              : fullCancelling
+                ? fullStatus.stage_label || "Cancelling"
+                : fullStatus.stage_label || "Meeting analysis in progress"}
           </p>
           <p className="saas-processing-banner-meta">
             {progress}% complete
-            {" · "}
-            {fullDone ? "Ready to review" : formatEta(fullStatus.eta_seconds)}
-            {previewRunning ? " · Quick preview running" : ""}
-            {previewReady ? " · Quick preview ready" : ""}
+            {" - "}
+            {fullDone ? "Ready to review" : fullCancelling ? "Stopping" : formatEta(fullStatus.eta_seconds)}
+            {previewRunning ? " - Quick preview running" : ""}
+            {previewReady ? " - Quick preview ready" : ""}
           </p>
         </div>
         <div className="saas-processing-banner-actions">
@@ -68,7 +75,7 @@ export default function ProcessingStatusCard({
               View live insights
             </button>
           )}
-          {!fullDone && onCancel && (
+          {!fullDone && !fullCancelling && onCancel && (
             <button
               type="button"
               className="action-button saas-btn-outline saas-btn-compact"
@@ -86,7 +93,9 @@ export default function ProcessingStatusCard({
     <div className="saas-processing-card">
       <div className="saas-processing-illustration" aria-hidden />
       <span className="saas-processing-kicker">Background analysis</span>
-      <h2 className="saas-processing-title">Meeting summary is processing…</h2>
+      <h2 className="saas-processing-title">
+        {fullCancelling ? "Stopping analysis…" : "Meeting summary is processing..."}
+      </h2>
       <p className="saas-processing-subtitle">
         Follow the pipeline in real time. Transcript appears first, then highlights, then summary and domain.
       </p>
@@ -100,7 +109,11 @@ export default function ProcessingStatusCard({
           <div className="saas-processing-progress-fill" style={{ width: `${progress}%` }} />
         </div>
         <p className="saas-processing-status">
-          {fullDone ? "Final result is ready." : formatEta(fullStatus.eta_seconds)}
+          {fullDone
+            ? "Final result is ready."
+            : fullCancelling
+              ? "Wrapping up and releasing resources."
+              : formatEta(fullStatus.eta_seconds)}
         </p>
       </div>
 
@@ -115,7 +128,7 @@ export default function ProcessingStatusCard({
         </div>
         <div className="saas-processing-metric">
           <span className="saas-processing-metric-label">Status</span>
-          <strong>{fullDone ? "Ready to review" : "Running"}</strong>
+          <strong>{fullDone ? "Ready to review" : fullCancelling ? "Cancelling" : "Running"}</strong>
         </div>
       </div>
 
@@ -158,7 +171,7 @@ export default function ProcessingStatusCard({
             Open live insights
           </button>
         )}
-        {!fullDone && onCancel && (
+        {!fullDone && !fullCancelling && onCancel && (
           <button
             type="button"
             className="action-button saas-btn-outline"

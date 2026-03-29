@@ -1,3 +1,5 @@
+"""Run GAP1 ablation experiments and collect metrics."""
+
 import argparse
 import csv
 import json

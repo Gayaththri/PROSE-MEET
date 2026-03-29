@@ -1,3 +1,5 @@
+"""Metric calculation helpers for evaluation pipelines."""
+
 import math
 import re
 from collections import Counter

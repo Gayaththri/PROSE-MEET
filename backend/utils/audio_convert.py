@@ -1,3 +1,6 @@
+"""
+Normalizes input audio to 16kHz mono WAV (or skips when already compliant) and creates optional preview clips for fast pipeline processing.
+"""
 import subprocess
 import os
 import uuid

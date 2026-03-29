@@ -1,3 +1,5 @@
+"""Benchmark runtime performance of pipeline variants."""
+
 import argparse
 import json
 import os

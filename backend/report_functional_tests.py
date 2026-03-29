@@ -1,3 +1,5 @@
+"""Generate reports for functional test executions."""
+
 import argparse
 import csv
 import os

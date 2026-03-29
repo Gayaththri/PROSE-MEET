@@ -1,21 +1,6 @@
 """
-ASR using faster-whisper (CTranslate2): 4–6x faster than OpenAI Whisper.
-
-Optimization summary (aligned with best practices):
-- faster-whisper + CTranslate2  → 4–6x speedup (GPU/CPU)
-- Quantization: float16 on GPU, int8 on CPU (fallback to float32 if int8 fails)
-- Small model: tiny (default) for speed; base/small for balance; large-v3-turbo for accuracy+speed
-- VAD: vad_filter=True to skip silence and reduce work
-- Batching: batch_size=4 for parallel segments (disable with WHISPER_DISABLE_BATCH=1)
-
-Env vars:
-- WHISPER_MODEL: tiny (default for reliability). For better accuracy use base, small, or
-  large-v3-turbo (Whisper Turbo). Presets: tiny, base, small, medium, large-v3, large-v3-turbo.
-  Set in .env or env to use turbo: WHISPER_MODEL=large-v3-turbo. Or path to CTranslate2 model dir.
-- USE_CUDA: set to 1/true/yes to force GPU; otherwise auto-detected.
-- WHISPER_DISABLE_BATCH: set to 1 to disable batching (if you see transcription errors).
-- WHISPER_NO_VAD: set to 1 to disable voice-activity filtering; transcribes the entire file (helps capture very quiet speech, may add noise).
-- WHISPER_CPU_THREADS: on CPU, number of threads for CTranslate2 (default: os.cpu_count() or 1). Tuning to 6–8 on multi-core machines can reduce ASR decode time by ~10–15% with identical transcript output.
+Fast, configurable ASR pipeline using faster-whisper with cached model loading and segment-level confidence metadata.
+Transcribes audio into timestamped text segments using faster-whisper, with device-aware loading and optional ASR confidence/timing metadata.
 """
 import os
 import math
@@ -23,6 +8,7 @@ import time
 from faster_whisper import WhisperModel
 
 from .timing import TimingCollector
+from .job_control import JobCancelledError
 
 _model_name = os.getenv("WHISPER_MODEL", "tiny")
 
@@ -112,6 +98,7 @@ def transcribe_audio(
     audio_path: str,
     language: str = "en",
     timing_collector: TimingCollector | None = None,
+    cancel_checker=None,
 ):
     """
     Transcribe full audio using faster-whisper (CTranslate2).
@@ -166,6 +153,8 @@ def transcribe_audio(
 
     segments = []
     for i, seg in enumerate(segments_gen):
+        if cancel_checker and cancel_checker():
+            raise JobCancelledError("Processing cancelled by user.")
         text = (seg.text or "").strip()
         if text:
             avg_logprob = getattr(seg, "avg_logprob", None)

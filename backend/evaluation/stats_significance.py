@@ -1,3 +1,5 @@
+"""Run statistical significance tests on experiment results."""
+
 import argparse
 import csv
 import json

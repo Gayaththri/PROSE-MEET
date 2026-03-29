@@ -1,3 +1,5 @@
+"""Alignment helpers for transcript and prosody signals."""
+
 import numpy as np
 
 

@@ -1,3 +1,4 @@
+// Reusable modal wrapper for dialog content.
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
 export default function Modal({

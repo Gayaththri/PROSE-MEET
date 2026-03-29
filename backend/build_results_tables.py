@@ -1,3 +1,5 @@
+"""Build consolidated tables from experiment outputs."""
+
 import argparse
 import json
 import os

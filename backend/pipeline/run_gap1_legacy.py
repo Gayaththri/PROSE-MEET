@@ -1,3 +1,6 @@
+"""
+Runs the legacy end-to-end Gap 1 pipeline (ASR, prosody alignment, importance scoring, domain adaptation, highlights, and summary generation).
+"""
 import concurrent.futures
 
 import librosa
@@ -5,7 +8,6 @@ import numpy as np
 
 from .alignment import align_text_prosody
 from .asr import transcribe_audio
-from .diarization import assign_speakers_to_segments, diarize_audio
 from .domain import (
     apply_domain_adaptation,
     detect_domain,
@@ -15,8 +17,6 @@ from .domain import (
 from .importance import compute_importance
 from .speakers import (
     compute_speaker_contribution,
-    compute_speaker_contribution_from_labels,
-    infer_and_apply_speaker_names,
 )
 from .summary import generate_speaker_summaries, generate_summary, top_substantive_highlights
 from .timing import TimingCollector, timed_stage
@@ -72,24 +72,8 @@ def run_gap1_legacy(audio_path: str, timing_collector: TimingCollector | None = 
     with timed_stage(timing_collector, "compute_importance"):
         ranked_base = compute_importance(aligned)
 
-    diarization_segments = diarize_audio(
-        audio_path=audio_path,
-        waveform=audio,
-        sample_rate=sr,
-        min_speakers=2,
-        max_speakers=20,
-        timing_collector=timing_collector,
-    )
-    unique_diarization_speakers = (
-        len(set(sp for _, _, sp in diarization_segments))
-        if diarization_segments else 0
-    )
     with timed_stage(timing_collector, "speaker_assignment"):
-        if diarization_segments and unique_diarization_speakers >= 2:
-            assign_speakers_to_segments(ranked_base, diarization_segments)
-            speakers = compute_speaker_contribution_from_labels(ranked_base)
-        else:
-            speakers = compute_speaker_contribution(ranked_base)
+        speakers = compute_speaker_contribution(ranked_base)
 
     with timed_stage(timing_collector, "detect_domain_pass_1"):
         domain_result = detect_domain(
@@ -127,8 +111,6 @@ def run_gap1_legacy(audio_path: str, timing_collector: TimingCollector | None = 
         "speakers": speakers,
         "importance_threshold": domain_importance_threshold,
     }
-    with timed_stage(timing_collector, "speaker_name_inference"):
-        infer_and_apply_speaker_names(ranked, result["speaker_summaries"], result["speakers"])
     with timed_stage(timing_collector, "summary_generation"):
         result["transcript"] = sorted(result["transcript"], key=lambda x: x["start"])
         result["summary"] = generate_summary(result["transcript"], top_ratio=1.0, max_segments=150)

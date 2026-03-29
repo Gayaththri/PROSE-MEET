@@ -1,3 +1,4 @@
+// Meeting overview panel with high level metadata.
 import LoadingSkeleton from "./LoadingSkeleton";
 
 /**
@@ -11,13 +12,13 @@ export default function MeetingOverview({ result, loading = false }) {
   const meetingTitle = filename.replace(/\.[^/.]+$/, "") || filename;
   const durationSeconds = result?.duration_seconds;
   const domain = result?.domain || {};
-  const domainLabel = domain.domain_label || (domain.predicted_domain && domain.predicted_domain.charAt(0).toUpperCase() + domain.predicted_domain.slice(1)) || "—";
+  const domainLabel = domain.domain_label || (domain.predicted_domain && domain.predicted_domain.charAt(0).toUpperCase() + domain.predicted_domain.slice(1)) || "-";
   const confidence = typeof domain.confidence === "number" ? domain.confidence : 0;
-  const adaptationStrategy = domain.adaptation_strategy || "—";
+  const adaptationStrategy = domain.adaptation_strategy || "-";
   const domainReady = Boolean(domain.predicted_domain || domain.domain_label);
 
   const formatDuration = (seconds) => {
-    if (seconds == null || seconds === undefined) return "—";
+    if (seconds == null || seconds === undefined) return "-";
     const total = Math.max(0, Math.round(seconds));
     const h = Math.floor(total / 3600);
     const m = Math.floor((total % 3600) / 60);
@@ -46,9 +47,6 @@ export default function MeetingOverview({ result, loading = false }) {
             <>
               <span className={domainBadgeClass} title="Domain inferred from transcript and summary (Gap 2)">
                 {domainLabel}
-              </span>
-              <span className="saas-overview-tooltip" title="Domain is inferred from meeting content so summaries and highlights can be adapted (e.g. decision-focused for corporate).">
-                ⓘ
               </span>
             </>
           ) : (

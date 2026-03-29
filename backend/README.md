@@ -6,14 +6,35 @@ Gap 1 + Gap 2 behavior:
 - Gap 1 computes utterance importance from semantic + prosodic fusion.
 - Gap 2 detects meeting domain (corporate/academic/medical) and applies domain-adaptive boosts to ranking/highlights so domain influences output, not just UI labels.
 
+**Gap 2 domain detection (default: self-supervised zero-shot):** uses a **frozen** pretrained sentence encoder (Sentence-BERT / MiniLM family) with **prototype-based zero-shot** classification — no fine-tuning on labelled meetings. Importance adaptation then uses **embedding similarity** to the predicted domain’s prototypes (not raw keyword overlap). Requires `sentence-transformers` / `torch` (see `requirements.txt`); if unavailable, the pipeline falls back to lexical `keyword` matching. Set `PROSE_DOMAIN_METHOD=keyword` to force the lexical baseline only.
+
 ## Quick start
 
+Use the same interpreter for installs and runs (on Windows, `pip` and `python` can point at different installs):
+
 ```bash
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
 API: `http://127.0.0.1:8000`
+
+### Tests
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest tests -q
+```
+
+### Manual Gap 1 smoke script
+
+`test_gap1.py` runs the full pipeline on a local WAV (not part of pytest). Default file: `<repo-root>/data/test_audio/meeting.wav` (create that folder and add a sample, or pass a path).
+
+```bash
+cd backend
+python test_gap1.py
+python test_gap1.py --audio path/to/meeting.wav
+```
 
 ---
 
@@ -306,9 +327,7 @@ See `backend/.env.example`. Key ones:
 
 - **`DATABASE_URL`** — PostgreSQL connection string. If unset, meetings are stored as JSON under `data/meetings/` (not suitable for multi-process or high durability).
 - **`WHISPER_MODEL`** — Preset name (`tiny`, `small`, `large-v3`, …) or absolute path to a CTranslate2 model directory. Ensure the path is valid on the deployment host.
-- **`BACKEND_CORS_ORIGINS`** — Comma-separated list of allowed frontend origins (CORS). Default: `http://localhost:5173`. If the UI is served from another origin (e.g. `https://app.example.com`), set this to that origin (and any dev origins you need), e.g. `https://app.example.com,http://localhost:5173`.
-- **`HUGGINGFACE_TOKEN`** — Optional; required only for pyannote speaker diarization.
-- **`OPENAI_API_KEY` / `LLM_SUMMARY_*`** — Optional; only if using an LLM for summaries.
+- **`BACKEND_CORS_ORIGINS`** — Comma-separated list of allowed frontend origins (CORS). Default includes common Vite dev URLs (`http://localhost:5173`, `http://localhost:5174`, and the same ports on `127.0.0.1`). If the UI is served from another origin (e.g. `https://app.example.com`), set this to that origin (and any dev origins you need), e.g. `https://app.example.com,http://localhost:5173`.
 
 ### CORS
 
@@ -324,7 +343,7 @@ BACKEND_CORS_ORIGINS=https://meet.example.com,http://localhost:5173
 - **`data/meetings/`** — JSON fallback when `DATABASE_URL` is unset. Prefer PostgreSQL for production.
 - **`temp_audio/`** — Temporary uploads during processing; can be ephemeral.
 
-Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not expose secrets (e.g. `DATABASE_URL`, `HUGGINGFACE_TOKEN`) in version control; use the environment or a secrets manager.
+Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not expose secrets (e.g. `DATABASE_URL`) in version control; use the environment or a secrets manager.
 
 ---
 
@@ -356,23 +375,11 @@ If `DATABASE_URL` is not set, the app still runs and saves meetings to `data/mee
 
 ---
 
-## Speaker diarization (identify speakers by voice)
+## Speaker estimation
 
-Speakers are identified using **pyannote.audio** (VAD → speaker embeddings → clustering → labeling). The pipeline uses **preprocessed mono 16 kHz audio** for best accuracy. Without a Hugging Face token, the app falls back to pause-based speaker estimation.
-
-### Setup
-
-1. Create a [Hugging Face token](https://hf.co/settings/tokens) (read access is enough).
-2. Accept the user conditions for the gated models:
-   - [pyannote/speaker-diarization-3.1](https://huggingface.co/pyannote/speaker-diarization-3.1)
-   - [pyannote/segmentation-3.0](https://huggingface.co/pyannote/segmentation-3.0)
-3. In `backend/.env` (or your environment), set:
-   ```env
-   HUGGINGFACE_TOKEN=hf_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-   ```
-   Alternatively you can run `huggingface-cli login` and leave the token unset; the pipeline will use the stored token.
-
-After restarting the backend, processing a meeting will run diarization and assign each transcript segment to a speaker by voice. Summary and “Speaker contribution” will reflect the diarized speakers.
+Speakers are estimated from transcript timing and pause-aware turn segmentation.  
+This keeps the pipeline lightweight and dependency-free while still producing
+`Speaker_1`, `Speaker_2`, ... contribution summaries.
 
 ---
 

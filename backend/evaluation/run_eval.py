@@ -1,3 +1,5 @@
+"""Execute end-to-end evaluation runs from manifests."""
+
 import argparse
 import csv
 import json

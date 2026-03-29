@@ -1,3 +1,6 @@
+"""
+Masks sensitive identifiers (email, phone, institutional IDs) in transcript-derived API payload fields while preserving the original result via deep copy.
+"""
 import copy
 import re
 from typing import Any, Dict

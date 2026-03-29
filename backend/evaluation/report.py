@@ -1,3 +1,5 @@
+"""Build aggregate evaluation reports from JSON metrics."""
+
 import json
 import os
 from datetime import datetime, timezone

@@ -1,3 +1,5 @@
+"""Run and summarize GAP evaluation metrics."""
+
 import argparse
 import csv
 import json

@@ -1,5 +1,8 @@
+"""FastAPI entrypoint and request handling for PROSE-MEET."""
+
 import asyncio
 import os
+import re
 import shutil
 import mimetypes
 import logging
@@ -29,7 +32,7 @@ os.environ.setdefault("HF_HUB_DISABLE_IMPLICIT_TOKEN", "1")
 
 from pipeline.run_gap1 import run_gap1
 from pipeline.asr import preload_model
-from pipeline.run_gap1 import JobCancelledError
+from pipeline.job_control import JobCancelledError
 from pipeline.timing import TimingCollector, log_timing_report, timed_stage
 from utils.audio_convert import convert_to_wav, create_preview_clip
 from utils.anonymize import anonymize_result_payload
@@ -49,6 +52,7 @@ from jobs import (
     list_meetings,
     get_meeting_result,
     delete_meeting,
+    resolve_recording_path,
 )
 
 
@@ -81,6 +85,13 @@ def _close_upload_file(upload_file) -> None:
             upload_file.file.close()
         except Exception:
             pass
+
+
+def _sanitize_upload_filename(filename: Optional[str]) -> str:
+    raw = (filename or "audio").strip()
+    base = os.path.basename(raw) or "audio"
+    safe = re.sub(r"[^A-Za-z0-9._-]+", "_", base).strip("._")
+    return safe or "audio"
 
 
 def _parse_started_at(value: Optional[str]) -> Optional[datetime]:
@@ -157,7 +168,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="PROSE-MEET Gap 1 API", lifespan=lifespan)
 
-_cors_origins = os.getenv("BACKEND_CORS_ORIGINS", "http://localhost:5173")
+# Default covers common Vite ports (5174 when 5173 is busy) and localhost vs 127.0.0.1.
+_default_cors_origins = (
+    "http://localhost:5173,http://localhost:5174,"
+    "http://127.0.0.1:5173,http://127.0.0.1:5174"
+)
+_cors_origins = os.getenv("BACKEND_CORS_ORIGINS", _default_cors_origins)
 _cors_origins_list = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
@@ -286,7 +302,7 @@ def process_gap1_job(
     except Exception as e:
         print(f"Job {job_id} failed: {e}")
         logger.exception("Job %s failed during processing.", job_id)
-        fail_job(job_id, str(e))
+        fail_job(job_id, "Processing failed. Please try again.")
     finally:
         for path in temp_paths_to_cleanup:
             if os.path.isfile(path):
@@ -309,7 +325,7 @@ async def run_gap1_endpoint(
 ):
     """
     Starts Gap 1 as an async background job. Accepts audio files up to 100 MB.
-    Speakers are identified automatically (voice + name inference from transcript).
+    Speakers are estimated from transcript timing and turn segmentation.
     """
     file: StarletteUploadFile = form_data.get("file")
     if not file or not isinstance(file, StarletteUploadFile):
@@ -322,7 +338,7 @@ async def run_gap1_endpoint(
     related_job_id = form_data.get("related_job_id") or None
 
     os.makedirs("temp_audio", exist_ok=True)
-    original_filename = file.filename or "audio"
+    original_filename = _sanitize_upload_filename(file.filename or "audio")
     job_id = create_job(
         filename=original_filename,
         preview=preview,
@@ -431,9 +447,8 @@ def get_recording(job_id: str):
             content={"detail": "This meeting does not have a saved recording"},
         )
 
-    backend_root = os.path.join(os.path.dirname(__file__), "..")
-    full_path = os.path.join(backend_root, recording_path)
-    if not os.path.isfile(full_path):
+    full_path = resolve_recording_path(recording_path)
+    if not full_path or not os.path.isfile(full_path):
         return JSONResponse(
             status_code=404, content={"detail": "Recording file is missing on server"}
         )

@@ -1,3 +1,6 @@
+"""
+Computes segment importance by fusing semantic/prosodic/context signals with optional supervised model probabilities, then applies reliability penalties and explainable reason tags.
+"""
 import numpy as np
 import re
 from typing import Optional

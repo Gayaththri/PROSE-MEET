@@ -6,8 +6,9 @@ Meeting audio pipeline: transcription (faster-whisper), prosody, utterance impor
 
 - **Python 3.x** — backend (ASR, importance, domain detection).
 - **Node.js** — frontend (Vite + React).
+- **FFmpeg** — required for audio/video conversion (the backend converts uploads to 16kHz mono WAV). Make sure `ffmpeg` is installed and available on your `PATH`.
 - **Optional:** [PostgreSQL](https://www.postgresql.org/download/) — persist meeting results (otherwise stored as JSON under `data/meetings/`).
-- **Optional:** [Hugging Face token](https://hf.co/settings/tokens) — for speaker diarization (pyannote); without it, the app uses pause-based speaker estimation.
+- **Optional:** [Hugging Face model access](https://huggingface.co/models) — only if you want to override the default Gap 2 sentence-transformer model via `PROSE_SSL_MODEL`.
 
 ## Quick start
 
@@ -15,25 +16,49 @@ Meeting audio pipeline: transcription (faster-whisper), prosody, utterance impor
 
 ```bash
 cd backend
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 uvicorn main:app --reload
 ```
 
+To run backend tests: `python -m pip install -r requirements-dev.txt` then `python -m pytest tests -q` (see [backend/README.md](backend/README.md)).
+
 API: **http://127.0.0.1:8000**
+
+**Backend configuration (recommended)**
+The backend loads environment variables from `backend/.env` (see `backend/.env.example`).
+
+From repo root:
+
+```powershell
+Copy-Item backend\.env.example backend\.env
+```
+
+Or from `backend/`:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Edit `backend/.env` to set (as needed):
+- `WHISPER_MODEL`
+- `DATABASE_URL` (PostgreSQL)
+- `BACKEND_CORS_ORIGINS`
+- `PROSE_DOMAIN_METHOD` (`ssl_zero_shot` or `keyword`)
+- `PROSE_SSL_MODEL` (optional sentence-transformer model id override)
 
 **2. Frontend** (separate terminal)
 
 ```bash
 cd frontend/prose-meet-frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Open the URL shown (e.g. **http://localhost:5173**). The UI talks to the backend at `http://127.0.0.1:8000`.
+Open the URL shown (e.g. **http://localhost:5173**). The UI talks to the backend at `http://127.0.0.1:8000`. For lint/build checks and `npm ci` vs `npm install`, see [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md).
 
 ## Documentation
 
-- **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), PostgreSQL setup, speaker diarization, deployment/production, and fine-tuned Whisper usage.
+- **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), PostgreSQL setup, deployment/production, and fine-tuned Whisper usage.
 - **[frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)** — Frontend setup and `VITE_API_BASE_URL` for configuring the backend API URL.
 
 ## Deployment

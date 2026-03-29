@@ -1,3 +1,5 @@
+"""Train and evaluate the importance classification model."""
+
 import argparse
 import csv
 from typing import Dict, List, Tuple

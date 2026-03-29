@@ -1,3 +1,5 @@
+"""Run a configured experiment and persist its results."""
+
 import argparse
 import json
 import os

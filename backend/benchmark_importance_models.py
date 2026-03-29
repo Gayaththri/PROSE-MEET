@@ -1,3 +1,5 @@
+"""Benchmark importance models against labeled datasets."""
+
 import argparse
 import csv
 import json

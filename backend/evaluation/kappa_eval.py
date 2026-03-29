@@ -1,3 +1,5 @@
+"""Compute inter-rater agreement for evaluation outputs."""
+
 import argparse
 import csv
 import json

@@ -1,3 +1,4 @@
+// API helpers for GAP-1 backend requests.
 import axios from "axios";
 
 export const API_BASE_URL =
@@ -54,6 +55,8 @@ export const deleteMeeting = async (jobId) => {
 };
 
 export const cancelJob = async (jobId) => {
-  const response = await API.post(`/jobs/${jobId}/cancel`);
+  const response = await API.post(`/jobs/${jobId}/cancel`, null, {
+    timeout: 20_000,
+  });
   return response.data;
 };
