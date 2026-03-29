@@ -2,7 +2,6 @@
 
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -50,12 +49,6 @@ def _pick_runtime_input(repo_root: str) -> str:
         "No runtime input folder found. Create data/test_audio or data/recordings with at least one "
         "audio file, or skip runtime benchmark. See backend/data/templates/README.md."
     )
-
-
-def _copy(src: str, dst: str):
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(src, dst)
-    print(f"copied: {src} -> {dst}")
 
 
 def main():
@@ -136,28 +129,46 @@ def main():
         cwd=repo_root,
     )
 
-    _run([py, "backend/report_functional_tests.py", "--repo-root", repo_root], cwd=repo_root)
-    _run([py, "backend/nfr_tests.py", "--repo-root", repo_root], cwd=repo_root)
-
-    # Copy final thesis artifacts to docs/
-    docs_dir = os.path.join(repo_root, "docs")
-    docs_figures = os.path.join(docs_dir, "figures")
-    os.makedirs(docs_figures, exist_ok=True)
-    _copy(chapter8_md, os.path.join(docs_dir, "chapter8_results.md"))
-    for fig_name in ("confusion_matrix.png", "roc_curve.png", "pr_curve.png"):
-        src = os.path.join(figures_dir, fig_name)
-        if os.path.isfile(src):
-            _copy(src, os.path.join(docs_figures, fig_name))
+    functional_md = os.path.join(run_dir, "functional_test_report.md")
+    functional_csv = os.path.join(run_dir, "functional_test_results.csv")
+    nfr_md = os.path.join(run_dir, "nfr_test_report.md")
+    nfr_csv = os.path.join(run_dir, "nfr_test_results.csv")
+    _run(
+        [
+            py,
+            "backend/report_functional_tests.py",
+            "--repo-root",
+            repo_root,
+            "--output-md",
+            functional_md,
+            "--output-csv",
+            functional_csv,
+        ],
+        cwd=repo_root,
+    )
+    _run(
+        [
+            py,
+            "backend/nfr_tests.py",
+            "--repo-root",
+            repo_root,
+            "--output-md",
+            nfr_md,
+            "--output-csv",
+            nfr_csv,
+        ],
+        cwd=repo_root,
+    )
 
     print("\n=== Completed run_all_experiments ===")
     print(f"run_dir={run_dir}")
     print("key_artifacts:")
-    print(f"- {os.path.join(repo_root, 'docs', 'chapter8_results.md')}")
-    print(f"- {os.path.join(repo_root, 'docs', 'figures', 'confusion_matrix.png')}")
-    print(f"- {os.path.join(repo_root, 'docs', 'figures', 'roc_curve.png')}")
-    print(f"- {os.path.join(repo_root, 'docs', 'figures', 'pr_curve.png')}")
-    print(f"- {os.path.join(repo_root, 'docs', 'functional_test_report.md')}")
-    print(f"- {os.path.join(repo_root, 'docs', 'nfr_test_report.md')}")
+    print(f"- {chapter8_md}")
+    print(f"- {os.path.join(figures_dir, 'confusion_matrix.png')}")
+    print(f"- {os.path.join(figures_dir, 'roc_curve.png')}")
+    print(f"- {os.path.join(figures_dir, 'pr_curve.png')}")
+    print(f"- {functional_md}")
+    print(f"- {nfr_md}")
 
 
 if __name__ == "__main__":

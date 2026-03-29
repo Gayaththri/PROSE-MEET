@@ -109,7 +109,7 @@ def main():
     parser.add_argument("--benchmark-json", required=True, help="Path to JSON from benchmark_importance_models.py --output-json")
     parser.add_argument("--ablation-json", default=None, help="Optional path to JSON from ablation_gap1.py --output-json")
     parser.add_argument("--runtime-json", default=None, help="Optional path to JSON from benchmark_runtime.py --output-json")
-    parser.add_argument("--output-md", default="docs/chapter8_results.md", help="Output markdown file path")
+    parser.add_argument("--output-md", default="results/chapter8_results.md", help="Output markdown file path")
     args = parser.parse_args()
 
     gap_eval = _read_json(args.gap_eval_json)

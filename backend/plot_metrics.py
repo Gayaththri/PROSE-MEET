@@ -171,7 +171,7 @@ def main():
     parser.add_argument("--gap-eval-json", required=True, help="Path to evaluate_gaps JSON output")
     parser.add_argument("--ablation-json", required=True, help="Path to ablation JSON output")
     parser.add_argument("--benchmark-json", required=True, help="Path to benchmark JSON output")
-    parser.add_argument("--output-dir", default="docs/figures", help="Output folder for generated figures")
+    parser.add_argument("--output-dir", default="results/figures", help="Output folder for generated figures")
     args = parser.parse_args()
 
     gap_eval = _read_json(args.gap_eval_json)

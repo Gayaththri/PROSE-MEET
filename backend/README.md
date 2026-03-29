@@ -147,7 +147,7 @@ This appends one JSON line per run to `data/experiments/runs.jsonl` for chapter-
 ### Build Chapter 8 markdown tables
 
 ```bash
-python build_results_tables.py --gap-eval-json data/experiments/gap_eval.json --benchmark-json data/experiments/benchmark.json --ablation-json data/experiments/ablation.json --runtime-json data/experiments/runtime.json --output-md docs/chapter8_results.md
+python build_results_tables.py --gap-eval-json data/experiments/gap_eval.json --benchmark-json data/experiments/benchmark.json --ablation-json data/experiments/ablation.json --runtime-json data/experiments/runtime.json --output-md results/chapter8_results.md
 ```
 
 ### Dataset templates (seed data)
@@ -277,13 +277,13 @@ This runs in sequence:
 ### 3) Plot generation from JSON outputs
 
 ```bash
-python backend/plot_metrics.py --gap-eval-json results/<timestamp>/gap_eval.json --ablation-json results/<timestamp>/ablation.json --benchmark-json results/<timestamp>/benchmark.json --output-dir docs/figures
+python backend/plot_metrics.py --gap-eval-json results/<timestamp>/gap_eval.json --ablation-json results/<timestamp>/ablation.json --benchmark-json results/<timestamp>/benchmark.json --output-dir results/figures
 ```
 
 Generates:
-- `docs/figures/confusion_matrix.png`
-- `docs/figures/roc_curve.png`
-- `docs/figures/pr_curve.png`
+- `results/figures/confusion_matrix.png`
+- `results/figures/roc_curve.png`
+- `results/figures/pr_curve.png`
 
 ### 4) Functional and non-functional test reports
 
@@ -292,11 +292,11 @@ python backend/report_functional_tests.py --repo-root .
 python backend/nfr_tests.py --repo-root .
 ```
 
-Generates:
-- `docs/functional_test_report.md`
-- `docs/functional_test_results.csv`
-- `docs/nfr_test_report.md`
-- `docs/nfr_test_results.csv`
+Generates (default paths under repo root):
+- `results/functional_test_report.md`
+- `results/functional_test_results.csv`
+- `results/nfr_test_report.md`
+- `results/nfr_test_results.csv`
 
 ### Required file formats
 

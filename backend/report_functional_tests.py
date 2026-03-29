@@ -161,8 +161,8 @@ def _write_md(path: str, rows: List[Dict], raw_output: str):
 def main():
     parser = argparse.ArgumentParser(description="Run backend functional tests and generate report artifacts.")
     parser.add_argument("--repo-root", default=".", help="Repository root")
-    parser.add_argument("--output-md", default="docs/functional_test_report.md", help="Markdown report path")
-    parser.add_argument("--output-csv", default="docs/functional_test_results.csv", help="CSV results path")
+    parser.add_argument("--output-md", default="results/functional_test_report.md", help="Markdown report path")
+    parser.add_argument("--output-csv", default="results/functional_test_results.csv", help="CSV results path")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(args.repo_root)

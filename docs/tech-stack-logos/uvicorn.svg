@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Uvicorn">
-  <title>Uvicorn (ASGI server)</title>
-  <rect width="128" height="128" rx="16" fill="#2B4C7E"/>
-  <text x="64" y="56" text-anchor="middle" fill="#fff" font-family="system-ui,Segoe UI,sans-serif" font-size="18" font-weight="700">Uvicorn</text>
-  <text x="64" y="82" text-anchor="middle" fill="#C8D4E8" font-family="system-ui,Segoe UI,sans-serif" font-size="12">ASGI</text>
-</svg>

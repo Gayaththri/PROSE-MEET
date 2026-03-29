@@ -150,8 +150,8 @@ def main():
     parser.add_argument("--workers", type=int, default=2, help="Worker threads for concurrency test")
     parser.add_argument("--jobs", type=int, default=2, help="Number of jobs for concurrency test")
     parser.add_argument("--max-failure-rate", type=float, default=0.0, help="Allowed failure rate")
-    parser.add_argument("--output-md", default="docs/nfr_test_report.md", help="Markdown report path")
-    parser.add_argument("--output-csv", default="docs/nfr_test_results.csv", help="CSV report path")
+    parser.add_argument("--output-md", default="results/nfr_test_report.md", help="Markdown report path")
+    parser.add_argument("--output-csv", default="results/nfr_test_results.csv", help="CSV report path")
     args = parser.parse_args()
 
     repo_root = os.path.abspath(args.repo_root)

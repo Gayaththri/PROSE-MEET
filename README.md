@@ -75,7 +75,7 @@ To regenerate Chapter 8 results and evaluation artifacts from a fresh clone:
 
 1. (Optional) Copy and fill `backend/data/importance_labels.csv` from `backend/data/templates/`, then run `python backend/train_importance_model.py --data backend/data/importance_labels.csv --label-col label` so the “Supervised” row is populated.
 2. From repo root: `python backend/run_all_experiments.py --repo-root . --output-root results`
-3. Outputs: timestamped dir under `results/` (gap_eval.json, benchmark.json, ablation.json, etc.), updated `docs/chapter8_results.md`, and `docs/figures/` plots. Seed templates in `backend/data/templates/` are used for eval data if `backend/data/eval_dataset.csv` is missing.
+3. Outputs: timestamped dir under `results/` (gap_eval.json, benchmark.json, ablation.json, `chapter8_results.md`, `figures/` plots, test reports, etc.). Seed templates in `backend/data/templates/` are used for eval data if `backend/data/eval_dataset.csv` is missing.
 
 ## Project layout
 

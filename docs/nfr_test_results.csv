@@ -1,4 +1,0 @@
-test_id,name,status,metric,value,threshold,notes
-NFR_LATENCY_RTF,Latency / real-time factor check,PASS,rtf,0.09934505881077269,2.5,elapsed=96.29s duration=969.22s
-NFR_CONCURRENCY,"Concurrency/load check (2 jobs, 2 workers)",PASS,failure_rate,0.0,0.0,elapsed=131.07s completed=2/2
-NFR_INVALID_INPUT,Invalid-input resilience check,PASS,raises_exception,1.0,1.0,Expected exception on non-existent audio path.
