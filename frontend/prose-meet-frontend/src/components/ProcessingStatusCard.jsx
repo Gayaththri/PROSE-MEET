@@ -1,3 +1,5 @@
+import { SparklesIcon } from "@heroicons/react/24/solid";
+
 // Status card showing processing progress and state.
 const PROCESS_STEPS = [
   { id: "preparing_audio", label: "Preparing audio", matches: ["queued", "starting", "preparing_audio"] },
@@ -91,7 +93,9 @@ export default function ProcessingStatusCard({
 
   return (
     <div className="saas-processing-card">
-      <div className="saas-processing-illustration" aria-hidden />
+      <div className="saas-processing-illustration" aria-hidden>
+        <SparklesIcon className="saas-processing-illustration-icon" />
+      </div>
       <span className="saas-processing-kicker">Background analysis</span>
       <h2 className="saas-processing-title">
         {fullCancelling ? "Stopping analysis…" : "Meeting summary is processing..."}

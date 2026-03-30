@@ -434,9 +434,9 @@ body,
   justify-content: center;
 }
 
-.saas-processing-illustration::before {
-  content: "\2726";
-  font-size: 28px;
+.saas-processing-illustration-icon {
+  width: 28px;
+  height: 28px;
   color: #169976;
 }
 
