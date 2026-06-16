@@ -1,8 +1,14 @@
 // API helpers for GAP-1 backend requests.
 import axios from "axios";
 
+// Dev: local FastAPI. Prod same-origin (HF Space / reverse proxy): relative URLs.
+const envUrl = import.meta.env.VITE_API_BASE_URL;
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+  envUrl !== undefined && String(envUrl).length > 0
+    ? envUrl
+    : import.meta.env.DEV
+      ? "http://127.0.0.1:8000"
+      : "";
 
 const API = axios.create({
   baseURL: API_BASE_URL,

@@ -510,3 +510,18 @@ def get_job_result(job_id: str, allow_partial: bool = False):
                 "error": "Job not completed yet",
             }
     return {"error": "Job not found"}
+
+
+def _mount_frontend_static():
+    """Serve built React UI from backend/static when SERVE_FRONTEND=1 (HF Space / single-container deploy)."""
+    if os.getenv("SERVE_FRONTEND", "").lower() not in ("1", "true", "yes"):
+        return
+    static_dir = os.path.join(os.path.dirname(__file__), "static")
+    if not os.path.isdir(static_dir):
+        return
+    from fastapi.staticfiles import StaticFiles
+
+    app.mount("/", StaticFiles(directory=static_dir, html=True), name="frontend")
+
+
+_mount_frontend_static()

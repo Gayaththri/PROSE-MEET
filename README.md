@@ -24,10 +24,10 @@ Re-run evaluation: `python backend/run_all_experiments.py --repo-root . --output
 
 ### Demo flow (for interviews)
 
-1. **Quick start (Windows):** `.\scripts\start-interview-demo.ps1` from repo root — or start backend + frontend manually (see **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)**).
-2. Open **http://localhost:5173** → upload a short meeting clip.
-3. Show transcript, importance heatmap, domain label, and highlights.
-4. Open **http://127.0.0.1:8000/docs** to show the REST API.
+1. **Share a link:** Deploy free on Hugging Face → **[SHARE_LINKS.md](SHARE_LINKS.md)** (one URL for UI + API).
+2. **Or screen-share locally:** `.\scripts\start-interview-demo.ps1` — see **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)**.
+3. Upload a short clip → show transcript, heatmap, domain, highlights.
+4. Open **/docs** on the API host to show REST endpoints.
 
 ## Prerequisites (install before running)
 
@@ -151,7 +151,8 @@ npm run build
 
 - **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), deployment/production, and fine-tuned Whisper usage.
 - **[frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)** — Frontend setup and `VITE_API_BASE_URL`.
-- **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)** — Free local interview demo (screen-share), warm-up checklist, and talking points.
+- **[SHARE_LINKS.md](SHARE_LINKS.md)** — **Links to send recruiters** (GitHub + free Hugging Face live demo).
+- **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)** — Local screen-share demo, warm-up checklist, talking points.
 - **[DEPLOY.md](DEPLOY.md)** — Hosted deploy (Vercel + Railway).
 
 ## Deployment & interview demo
