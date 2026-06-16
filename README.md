@@ -154,10 +154,12 @@ npm run build
 
 ## Deployment
 
-For production or a hosted deployment:
+**Live demo (recommended):** [Vercel](https://vercel.com) for the React UI + [Railway](https://railway.com) for the FastAPI/Whisper backend. Full step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
 
-- **Backend:** Configure `WHISPER_MODEL` (path or preset) and set `BACKEND_CORS_ORIGINS` to your frontend origin(s). See the **Deployment / production** section in [backend/README.md](backend/README.md) and `backend/.env.example`.
-- **Frontend:** Set `VITE_API_BASE_URL` to your backend API URL when building (`npm run build`). See [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md).
+For production or a self-hosted deployment:
+
+- **Backend:** Configure `WHISPER_MODEL` (path or preset) and set `BACKEND_CORS_ORIGINS` to your frontend origin(s). See the **Deployment / production** section in [backend/README.md](backend/README.md) and `backend/.env.example`. Docker: `backend/Dockerfile`.
+- **Frontend:** Set `VITE_API_BASE_URL` to your backend API URL when building (`npm run build`). See [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md) and `frontend/prose-meet-frontend/.env.example`.
 - **Paths:** Recordings and meeting JSON live under `data/`; use a persistent volume or object store if needed.
 
 ## Reproducibility

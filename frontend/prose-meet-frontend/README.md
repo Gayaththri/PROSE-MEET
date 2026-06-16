@@ -30,16 +30,8 @@ npm run build
 
 By default the app uses **http://127.0.0.1:8000** as the backend API base URL. To override (e.g. for a different host or port):
 
-- **Development:** Create `.env.local` in this directory:
-  ```env
-  VITE_API_BASE_URL=http://127.0.0.1:8000
-  ```
-  Change the value to your backend URL. Vite only exposes variables prefixed with `VITE_`.
-
-- **Production build:** Set `VITE_API_BASE_URL` in the environment when running `npm run build`, or in your CI/deploy config, e.g.:
-  ```bash
-  VITE_API_BASE_URL=https://api.example.com npm run build
-  ```
+- **Development:** Create `.env.local` in this directory (see `.env.example`).
+- **Production (Vercel):** Set `VITE_API_BASE_URL` in Vercel → Project → Environment Variables, then redeploy. See [DEPLOY.md](../../DEPLOY.md).
 
 ## Scripts
 

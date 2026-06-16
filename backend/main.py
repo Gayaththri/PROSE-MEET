@@ -216,14 +216,22 @@ def _progress_callback_for(job_id: str):
 def _cancel_checker_for(job_id: str):
     return lambda: is_cancel_requested(job_id)
 
-# pre load whisper model
+# pre load whisper model (background thread so /health is ready for platform probes)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    try:
-        preload_model()
-        print("Whisper model loaded and ready.")
-    except Exception as e:
-        print(f"Warning: Could not preload Whisper model: {e}. First transcription may be slow or fail.")
+    import threading
+
+    def _preload():
+        try:
+            preload_model()
+            print("Whisper model loaded and ready.")
+        except Exception as e:
+            print(
+                f"Warning: Could not preload Whisper model: {e}. "
+                "First transcription may be slow or fail."
+            )
+
+    threading.Thread(target=_preload, daemon=True).start()
     yield
     # shutdown: nothing to clean up
 
@@ -244,6 +252,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/health")
+def health():
+    """Lightweight probe for Railway / load balancers."""
+    return {"status": "ok", "service": "prose-meet-api"}
 
 
 async def form_with_large_limits(request: Request):

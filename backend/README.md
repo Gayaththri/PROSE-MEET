@@ -184,6 +184,8 @@ BACKEND_CORS_ORIGINS=https://meet.example.com,http://localhost:5173
 
 Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not expose secrets in version control; use the environment or a secrets manager.
 
+**Docker / Railway:** Use `backend/Dockerfile` and follow [DEPLOY.md](../DEPLOY.md). Health probe: `GET /health`.
+
 ---
 
 ## Speaker summaries
