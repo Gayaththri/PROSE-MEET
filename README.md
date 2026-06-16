@@ -1,6 +1,33 @@
 # PROSE-MEET
 
-Meeting audio pipeline: transcription (faster-whisper), prosody, utterance importance, and summaries — with an optional web UI to upload/record audio and view results.
+**Prosody-aware, domain-adaptable meeting summarisation** — upload or record meeting audio, transcribe with faster-whisper, score utterance importance (semantics + prosody), detect meeting domain (corporate / academic / medical), and surface highlights and summaries in a React UI.
+
+### Research contributions
+
+| Gap | Problem | Approach |
+|-----|---------|----------|
+| **Gap 1** | Which utterances matter? | Rule-based fusion of TF-IDF semantics + prosody (pitch, energy, pauses), with an optional **supervised** logistic-regression classifier trained on labelled utterances. |
+| **Gap 2** | Meetings differ by domain | **Self-supervised zero-shot** domain detection (frozen Sentence-BERT + prototype matching), with domain-adaptive ranking boosts. Lexical baseline available via `PROSE_DOMAIN_METHOD=keyword`. |
+
+### Key results (committed under `results/20260428_114739/`)
+
+Evaluated on 6,513 labelled utterances across 15 meetings (AMI-derived seed data):
+
+| Metric | Result | Notes |
+|--------|--------|-------|
+| **Gap 1 — fusion (rule-based)** | F1 **0.60**, AUC **0.75** | Best interpretable baseline (`ablation.json` → `fusion_rule_based`). |
+| **Gap 1 — semantics only** | F1 **0.61**, AUC **0.76** | Strongest single signal in ablation. |
+| **Gap 1 — supervised model** | AUC **0.81**, val F1 **0.60** | See `backend/models/importance_classifier_meta.json` for validation metrics. |
+| **Gap 2 — domain accuracy** | **73%** overall (15 meetings) | Per-domain breakdown in `gap_eval.json`. |
+
+Re-run evaluation: `python backend/run_all_experiments.py --repo-root . --output-root results`
+
+### Demo flow (for interviews)
+
+1. Start backend → `cd backend` → `python -m uvicorn main:app --reload`
+2. Start frontend → `cd frontend/prose-meet-frontend` → `npm run dev`
+3. Upload a short meeting clip → watch transcript, importance heatmap, domain label, and highlights populate.
+4. Open **http://127.0.0.1:8000/docs** to show the REST API.
 
 ## Prerequisites (install before running)
 
@@ -78,7 +105,7 @@ python -m uvicorn main:app --reload
 - API base URL: **http://127.0.0.1:8000**
 - Interactive docs: **http://127.0.0.1:8000/docs**
 
-**Backend validation** (optional): run the evaluation scripts under `backend/evaluation/` and NFR checks in [backend/README.md](backend/README.md).
+**Backend validation** (optional): run the evaluation scripts under `backend/evaluation/` — see [Reproducibility](#reproducibility) and [backend/README.md](backend/README.md).
 
 ### 2. Frontend (Vite + React)
 
@@ -145,5 +172,6 @@ To regenerate Chapter 8 results and evaluation artifacts from a fresh clone:
 
 - `backend/` — FastAPI app, faster-whisper ASR, importance/domain pipeline, evaluation scripts.
 - `frontend/prose-meet-frontend/` — React + Vite UI for upload/record and viewing transcripts, summaries, and highlights.
-- `data/` (repo root, gitignored) — Runtime data: `meetings/` (saved results JSON), `recordings/` (uploaded audio), optional `test_audio/` (sample audio for local runtime checks). Folders are created or refilled as you use the app; clearing `recordings/` and `test_audio/` does not break the UI (see [Smaller zip](#smaller-zip-for-submission-google-drive-etc)).
+- `data/` (repo root, gitignored) — Runtime data: `meetings/` (saved results JSON), `recordings/` (uploaded audio). Folders are created as you use the app; clearing them does not break the UI.
+- `results/` — Timestamped evaluation outputs (`gap_eval.json`, `benchmark.json`, `ablation.json`) from `run_all_experiments.py`.
 - `backend/data/templates/` — Seed CSV/manifest templates; see `backend/data/templates/README.md` for running eval and experiments on a fresh clone.

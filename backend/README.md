@@ -43,11 +43,7 @@ Optional feature columns (recommended):
 python train_importance_model.py --data data/importance_labels.csv --label-col label
 ```
 
-### Recalibrate threshold only
-
-```bash
-# Threshold is stored in `backend/models/importance_classifier_meta.json` when the model is trained.
-```
+The calibrated decision threshold is saved in `backend/models/importance_classifier_meta.json` when you train. Re-run the training command above to refresh both the model and threshold.
 
 ### Evaluate Gap 1 + Gap 2 (single script)
 
@@ -190,11 +186,9 @@ Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not e
 
 ---
 
-## Speaker estimation
+## Speaker summaries
 
-Speakers are estimated from transcript timing and pause-aware turn segmentation.  
-This keeps the pipeline lightweight and dependency-free while still producing
-`Speaker_1`, `Speaker_2`, ... contribution summaries.
+The pipeline groups utterances under generic labels (`Speaker_1`, `Speaker_2`, …) for per-speaker contribution summaries. It does **not** run full speaker diarization (no pyannote / embedding-based diarization) — this keeps dependencies and runtime low. If ASR segments lack a `speaker` field, summaries default to a single speaker bucket.
 
 ---
 
