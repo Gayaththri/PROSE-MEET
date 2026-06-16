@@ -1,5 +1,5 @@
 /**
- * Highest-importance moments as a vertical action items list (one row each).
+ * Highest importance moments as a vertical action items list (one row each).
  * Icons reflect inferred type from segment text + importance_reasons.
  */
 import { useMemo } from "react";
@@ -133,10 +133,7 @@ function finalImportanceScore(seg) {
   const pro = prosodyScore(seg);
   const act = actionKeywordScore(seg);
 
-  // Composite ranking for action items:
-  // - Keep high model/rule importance as the main signal
-  // - Require semantic/action relevance
-  // - Reward prosodic emphasis as supporting evidence
+  // Composite ranking for action items
   const base =
     0.45 * rawImportance +
     0.30 * sem +
@@ -271,7 +268,7 @@ export default function HighestImportanceActionBoard({
               const body = seg.text || seg.content || "(no text)";
               const score =
                 typeof seg.importance_score === "number"
-                  ? seg.importance_score.toFixed(2)
+                  ? seg.importance_score.toFixed(1)
                   : "—";
               const timeLabel =
                 typeof seg.start === "number" && typeof seg.end === "number"

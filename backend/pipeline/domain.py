@@ -1,15 +1,14 @@
 """
-Detects meeting domain and applies domain-adaptive reweighting to importance scores for more context-aware highlights and summaries.
+Detects meeting domain and applies domain adaptive reweighting to importance scores
 """
 import math
 import os
 import re
-from typing import Dict, Any, List
+from typing import Any, Dict, List, Optional
 
-# Domain keywords (lowercase) – presence boosts that domain's score
+# Domain keywords (lowercase) presence boosts that domain's score
 DOMAIN_SIGNALS = {
     "corporate": [
-        # Note: "meeting" is omitted — it appears in corporate, academic, and medical
         # recordings alike and skews lexical scores toward Corporate.
         "agenda", "minutes", "project", "plan", "discuss", "decision",
         "stakeholder", "team", "action", "follow up", "schedule", "deadline",
@@ -22,7 +21,7 @@ DOMAIN_SIGNALS = {
         "conference", "citation", "methodology", "hypothesis", "findings",
         "literature", "seminar", "course", "assignment", "grading", "student",
         "professor", "department", "publication", "journal", "peer review",
-        # Research-lab / speech & language meetings (e.g. ICSI-style transcripts)
+        # Research lab / speech & language meetings (e.g. ICSI style transcripts)
         "transcript", "annotation", "annotations", "corpus", "dataset",
         "utterance", "discourse", "prosody", "alignment", "recognizer",
         "recognition", "speaker", "channel", "overlap", "segment", "lattice",
@@ -35,7 +34,7 @@ DOMAIN_SIGNALS = {
     ],
 }
 
-# Human-readable labels and adaptation strategies per domain
+# Human readable labels and adaptation strategies per domain
 DOMAIN_LABELS = {
     "corporate": ("Corporate", "Decision-Focused"),
     "academic": ("Academic", "Evidence-Focused"),
@@ -77,6 +76,7 @@ def _detect_domain_keyword(
     transcript: List[Dict[str, Any]],
     summary: str = None,
     speaker_summaries: List[Dict[str, Any]] = None,
+    session_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Lexical keyword baseline (no neural encoder)."""
     text = _text_from_segments(transcript)
@@ -85,6 +85,8 @@ def _detect_domain_keyword(
     if speaker_summaries:
         for sp in speaker_summaries:
             text += " " + (sp.get("summary") or "").strip().lower()
+    if session_context and str(session_context).strip():
+        text = (str(session_context).strip().lower() + " " + text).strip()
     text = re.sub(r"\s+", " ", text).strip()
     if not text:
         return {
@@ -113,7 +115,6 @@ def _detect_domain_keyword(
 
     best_domain = max(scores, key=scores.get)
     raw = scores[best_domain]
-    # Map to a plausible confidence (e.g. 0.5–0.95) so we don't show 0.02
     confidence = min(0.95, 0.5 + raw * 0.6)
     label, strategy = DOMAIN_LABELS.get(best_domain, (best_domain.title(), "General"))
 
@@ -130,6 +131,7 @@ def detect_domain(
     transcript: List[Dict[str, Any]],
     summary: str = None,
     speaker_summaries: List[Dict[str, Any]] = None,
+    session_context: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Predict meeting domain from transcript and optional summary text.
@@ -152,7 +154,10 @@ def detect_domain(
     method = (os.getenv("PROSE_DOMAIN_METHOD") or "ssl_zero_shot").strip().lower()
     if method in ("keyword", "lexical"):
         return _detect_domain_keyword(
-            transcript, summary=summary, speaker_summaries=speaker_summaries
+            transcript,
+            summary=summary,
+            speaker_summaries=speaker_summaries,
+            session_context=session_context,
         )
     try:
         from .ssl_zero_shot_domain import detect_domain_ssl_zero_shot
@@ -161,10 +166,14 @@ def detect_domain(
             transcript=transcript,
             summary=summary,
             speaker_summaries=speaker_summaries,
+            session_context=session_context,
         )
     except Exception:
         return _detect_domain_keyword(
-            transcript, summary=summary, speaker_summaries=speaker_summaries
+            transcript,
+            summary=summary,
+            speaker_summaries=speaker_summaries,
+            session_context=session_context,
         )
 
 
@@ -189,7 +198,7 @@ def get_domain_importance_threshold(domain_result: Dict[str, Any]) -> float:
         "medical": 0.60,
     }.get(domain, 0.56)
 
-    # If domain certainty is low, relax threshold slightly to avoid over-filtering.
+    # If domain certainty is low, relax threshold slightly to avoid over filtering.
     relax = (0.6 - confidence) * 0.08 if confidence < 0.6 else 0.0
     threshold = max(0.45, min(0.75, base - relax))
     return round(threshold, 3)

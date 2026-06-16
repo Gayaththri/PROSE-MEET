@@ -11,24 +11,10 @@ const API = axios.create({
 export const runGap1 = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
+  // Do not set Content-Type manually: the client must send multipart boundary.
+  // A bare "multipart/form-data" header breaks parsing and can hang the server.
   const response = await API.post("/run-gap1", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
-  });
-  return response.data;
-};
-
-export const runGap1WithOptions = async (file, options = {}) => {
-  const formData = new FormData();
-  formData.append("file", file);
-  if (options.preview) {
-    formData.append("preview", "true");
-    formData.append("preview_seconds", String(options.previewSeconds ?? 45));
-  }
-  if (options.relatedJobId) {
-    formData.append("related_job_id", options.relatedJobId);
-  }
-  const response = await API.post("/run-gap1", formData, {
-    headers: { "Content-Type": "multipart/form-data" },
+    timeout: 600_000,
   });
   return response.data;
 };

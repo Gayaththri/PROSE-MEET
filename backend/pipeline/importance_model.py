@@ -1,5 +1,5 @@
 """
-Trains, calibrates, saves, and serves a logistic-regression importance classifier using TF-IDF text plus prosody/ASR/context features.
+Trains, calibrates, saves, and serves a logistic regression importance classifier using TF-IDF text plus prosody/ASR/context features.
 """
 import json
 import os
@@ -15,9 +15,9 @@ from sklearn.metrics import precision_recall_curve
 from sklearn.preprocessing import StandardScaler
 
 
-MODEL_FILENAME = "importance_classifier.joblib"
+MODEL_FILENAME = "importance_classifier.joblib" # trained supervised bundle
 METADATA_FILENAME = "importance_classifier_meta.json"
-DEFAULT_THRESHOLD = 0.5
+DEFAULT_THRESHOLD = 0.5 #fall back thresh hold
 
 _SEMANTIC_KEYWORDS = [
     "need to",
@@ -71,7 +71,7 @@ _HALLUCINATION_BLOCKLIST = frozenset(
     )
 )
 
-
+# Default folder for saved classifier + metadata (models)
 def _default_model_dir() -> str:
     backend_root = os.path.dirname(os.path.dirname(__file__))
     return os.path.join(backend_root, "models")
@@ -138,7 +138,7 @@ def build_feature_matrices(
     else:
         prev_numeric = np.vstack([np.zeros((1, base_numeric.shape[1]), dtype=np.float32), base_numeric[:-1]])
         next_numeric = np.vstack([base_numeric[1:], np.zeros((1, base_numeric.shape[1]), dtype=np.float32)])
-        # Context-window features: previous and next segment cues.
+        # Context window features: previous and next segment cues
         numeric = np.hstack([base_numeric, prev_numeric, next_numeric]).astype(np.float32)
 
     if fit:
@@ -155,7 +155,7 @@ def build_feature_matrices(
     x = sparse.hstack([text_matrix, sparse.csr_matrix(numeric_scaled)], format="csr")
     return x, vectorizer, scaler
 
-
+# Train the importance classifier using logistic regression
 def train_classifier(
     segments: Sequence[Dict[str, Any]],
     labels: Sequence[int],
@@ -170,7 +170,7 @@ def train_classifier(
         "classifier": classifier,
     }
 
-
+# Predict importance probabilities for a list of segments using the trained model
 def predict_probabilities(
     segments: Sequence[Dict[str, Any]],
     model_bundle: Dict[str, Any],
@@ -186,7 +186,7 @@ def predict_probabilities(
     probs = model_bundle["classifier"].predict_proba(x)[:, 1]
     return probs.astype(np.float32)
 
-
+# Calibrate the threshold for the importance classifier
 def calibrate_threshold(
     labels: Sequence[int],
     probabilities: Sequence[float],
@@ -221,7 +221,7 @@ def calibrate_threshold(
         return {"threshold": DEFAULT_THRESHOLD, "f1": 0.0, "precision": 0.0, "recall": 0.0}
     return best
 
-
+# Save the trained model and metadata to disk
 def save_model(
     model_bundle: Dict[str, Any],
     threshold: float,
@@ -241,7 +241,7 @@ def save_model(
 
     return {"model_path": model_path, "metadata_path": metadata_path}
 
-
+# Load the trained model and metadata from disk
 def load_model(model_dir: Optional[str] = None) -> Optional[Dict[str, Any]]:
     model_path, metadata_path = model_paths(model_dir=model_dir)
     if not os.path.isfile(model_path):

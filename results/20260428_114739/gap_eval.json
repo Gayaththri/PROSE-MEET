@@ -1,0 +1,20 @@
+{
+  "dataset_rows": 6513,
+  "gap1": {
+    "samples": 6513.0,
+    "threshold": 8.068481882617107e-09,
+    "precision": 0.2771805896805897,
+    "recall": 1.0,
+    "f1": 0.43405073944932065,
+    "auc": 0.8103455072641135
+  },
+  "gap2": {
+    "meetings": 15.0,
+    "accuracy": 0.7333333333333333,
+    "accuracy_academic": 0.0,
+    "accuracy_corporate": 1.0,
+    "accuracy_medical": 0.0
+  },
+  "gap1_error": null,
+  "gap2_error": null
+}

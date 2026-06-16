@@ -1,5 +1,5 @@
 """
-Extracts lightweight frame-level prosody proxies (spectral-centroid pitch, RMS energy, and silence mask) for downstream transcript alignment and importance scoring.
+Extract prosodic signals (pitch proxy, energy, and silence) 
 """
 import numpy as np
 import librosa
@@ -8,13 +8,14 @@ import time
 from .job_control import JobCancelledError
 
 
-FRAME_LENGTH = 2048
-HOP_LENGTH = 1024
+FRAME_LENGTH = 2048 #size of each analysis window
+HOP_LENGTH = 1024 #how much to move forward between windows
 
 # Process long audio in chunks so cancellation can be detected between librosa calls.
 _PROSODY_CHUNK_SECONDS = 30.0
 
 
+# Extract frame level prosody features: energy, pitch, and silence
 def _extract_prosody_single(audio, sr: int, timing_collector, started: float):
     energy = librosa.feature.rms(
         y=audio,

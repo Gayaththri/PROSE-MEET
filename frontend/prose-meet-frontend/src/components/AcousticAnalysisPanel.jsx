@@ -1,5 +1,5 @@
 /**
- * Prosody Graph Panel - Acoustic Analysis
+ * Prosody Graph Panel
  * Shows pitch and energy over time so examiners can see the raw signal processing.
  */
 import { useMemo } from "react";

@@ -1,14 +1,21 @@
 {
-  "threshold": 0.5459809899330139,
+  "threshold": 0.5718376040458679,
   "metrics": {
-    "precision": 0.611699164345404,
-    "recall": 0.6368909512761021,
-    "f1": 0.6240409207161125,
-    "auc": 0.7826928849725767,
-    "calibrated_threshold": 0.5459809899330139,
-    "threshold_precision": 0.611699164345404,
-    "threshold_recall": 0.6368909512761021,
-    "threshold_f1": 0.6240409207161126,
-    "calibration_size": 5434
+    "precision": 0.5662263477329526,
+    "recall": 0.6392583635630794,
+    "f1": 0.6005301022340023,
+    "auc": 0.8137629600501661,
+    "train_precision": 0.7000463606861381,
+    "train_recall": 0.6902541598098373,
+    "train_f1": 0.695115775905722,
+    "train_auc": 0.8603078683143875,
+    "overfit_f1_gap": 0.09458567367171977,
+    "overfit_auc_gap": 0.04654490826422142,
+    "calibrated_threshold": 0.5718376040458679,
+    "threshold_precision": 0.5662263477329526,
+    "threshold_recall": 0.6392583635630794,
+    "threshold_f1": 0.6005301022340022,
+    "val_size": 10513,
+    "train_size": 38359
   }
 }

@@ -1,14 +1,15 @@
 """
-Computes segment importance by fusing semantic/prosodic/context signals with optional supervised model probabilities, then applies reliability penalties and explainable reason tags.
+explainable utterance importance by fusing supervised model probabilities with semantic/prosodic rule-based scoring and reliability penalties 
 """
 import numpy as np
 import re
 from typing import Optional
 
+#loading supervised importance model
 try:
     from .importance_model import load_model, predict_probabilities
     _IMPORTANCE_MODEL_IMPORT_ERROR = None
-except Exception as exc:  # pragma: no cover - graceful fallback when ML deps are missing
+except Exception as exc:  
     load_model = None
     predict_probabilities = None
     _IMPORTANCE_MODEL_IMPORT_ERROR = exc
@@ -68,20 +69,14 @@ _LOW_INFORMATION_PHRASES = frozenset(
     )
 )
 
-
+# Detect filler so importance can be down weighted
 def _contains_low_information(text_lower: str) -> bool:
-    """
-    More robust low-information detection than exact-string matching.
-    This prevents the model from treating conversational uncertainty like
-    "I don't really know..." as substantively important.
-    """
     if not text_lower:
         return True
 
     if text_lower in _LOW_INFORMATION_PHRASES:
         return True
 
-    # Pattern: "I don't ... know" (covers "I don't really know", "I don't know how ...", etc.)
     if re.search(r"\b(i|we)\s*don['’]?t\b.*\bknow\b", text_lower):
         return True
     if re.search(r"\bdon['’]?t\b.*\bknow\b", text_lower):
@@ -103,20 +98,6 @@ def _contains_low_information(text_lower: str) -> bool:
     }
     return any(t in short_backchannels for t in tokens)
 
-_HALLUCINATION_BLOCKLIST = frozenset(
-    s.strip().lower()
-    for s in (
-        "mermaid",
-        "whales",
-        "they can swim",
-        "television",
-        "five remotes",
-        "oh my god",
-        "it's not a mermaid",
-        "the reason i like whales",
-    )
-)
-
 _MODEL_BUNDLE = None
 _MODEL_LOAD_ATTEMPTED = False
 
@@ -130,11 +111,9 @@ def _level_from_percentiles(value, p33, p66):
     return "Medium"
 
 
+# Rule based text score: length, planning/decision keywords, and numbers
 def _semantic_score(text: str, word_count: int) -> tuple[float, list[str], int]:
-    """
-    Build a semantic base score from keyword, structure and content cues.
-    Prosody should only modify this score.
-    """
+
     if not text:
         return 0.0, [], 0
 
@@ -163,6 +142,7 @@ def _semantic_score(text: str, word_count: int) -> tuple[float, list[str], int]:
     return min(1.0, score), reasons, keyword_hits
 
 
+#loads the supervised importance model once and keeps it in memory
 def _get_model_bundle() -> Optional[dict]:
     global _MODEL_BUNDLE, _MODEL_LOAD_ATTEMPTED
     if _MODEL_LOAD_ATTEMPTED:
@@ -174,20 +154,27 @@ def _get_model_bundle() -> Optional[dict]:
     _MODEL_BUNDLE = load_model()
     return _MODEL_BUNDLE
 
-
+# Flag empty or non word like text (low letter ratio), e.g. noisy ASR / symbols
 def _is_low_reliability_text(text_lower: str) -> bool:
     if not text_lower:
-        return True
-    if any(p in text_lower for p in _HALLUCINATION_BLOCKLIST):
         return True
     alpha_chars = sum(1 for ch in text_lower if ch.isalpha())
     ratio_alpha = alpha_chars / max(len(text_lower), 1)
     return ratio_alpha < 0.45
 
 
+def _format_float_for_importance_reason(x: float) -> str:
+    """Format scores in importance_reasons without collapsing e.g. 0.997 to '1.00'."""
+    xf = float(x)
+    if not np.isfinite(xf):
+        return "?"
+    s = f"{xf:.8f}".rstrip("0").rstrip(".")
+    return s if s else "0"
+
+
 def compute_importance(aligned_segments):
     """
-    Compute prosody-aware importance scores for each utterance.
+    Compute prosody aware importance scores for each utterance.
     Importance is defined as deviation from meeting-level prosodic baselines.
     Also adds explainable prosody fields: pitch_variation_level, energy_level, pause_emphasis.
     """
@@ -200,7 +187,7 @@ def compute_importance(aligned_segments):
     energy = np.array([seg["mean_energy"] for seg in aligned_segments])
     pause = np.array([seg["pause_ratio"] for seg in aligned_segments])
 
-    # Meeting-level statistics
+    # # Baseline mean/std per meeting for prosody comparison
     pitch_mean, pitch_std = np.mean(pitch_var), np.std(pitch_var) + 1e-6
     energy_mean, energy_std = np.mean(energy), np.std(energy) + 1e-6
     pause_mean, pause_std = np.mean(pause), np.std(pause) + 1e-6
@@ -208,7 +195,7 @@ def compute_importance(aligned_segments):
     # Percentiles for explainable levels (Low / Medium / High)
     p_pitch_33, p_pitch_66 = np.percentile(pitch_var, 33), np.percentile(pitch_var, 66)
     p_energy_33, p_energy_66 = np.percentile(energy, 33), np.percentile(energy, 66)
-    p_pause_66 = np.percentile(pause, 66)  # Above this = pause emphasis detected
+    p_pause_66 = np.percentile(pause, 66)  
 
     model_bundle = _get_model_bundle()
     model_probs = None
@@ -216,7 +203,7 @@ def compute_importance(aligned_segments):
         try:
             model_probs = predict_probabilities(aligned_segments, model_bundle)
         except Exception:
-            # If model inference fails for any reason, continue with rule-based scoring.
+            # If model inference fails for any reason, continue with rule based scoring.
             model_probs = None
 
     semantic_scores = []
@@ -261,35 +248,37 @@ def compute_importance(aligned_segments):
 
         rule_score = semantic_score + prosody_boost + context_boost
         model_mode = model_probs is not None and idx < len(model_probs)
+        fused_before_penalties = None
         if model_mode:
             model_prob = float(model_probs[idx])
-            # Supervised + rule-based fusion.
+            # Supervised + rule based fusion.
             # Requirement: Do NOT use model_prob directly as final score.
-            importance_score = 0.7 * model_prob + 0.3 * rule_score
+            fused_before_penalties = 0.7 * model_prob + 0.3 * rule_score
+            importance_score = fused_before_penalties
         else:
             model_prob = None
-            # Rule-based fallback: semantic-first + bounded prosody boost.
+            # Rule based fallback: semantic first + bounded prosody boost.
             importance_score = rule_score
 
         # Apply ALL reliability penalties even in supervised mode.
-        # 1) Short segments (<5 words)
+        # Short segments (<5 words)
         if word_count < 5:
             importance_score -= 0.18
             if word_count <= 2:
                 importance_score -= 0.10
 
-        # 2) Filler/uncertainty phrases
+        # Filler/uncertainty phrases
         if text_lower in _LOW_INFORMATION_PHRASES or _contains_low_information(text_lower):
             importance_score -= 0.20
 
-        # 3) Low ASR confidence
+        # Low ASR confidence
         asr_confidence = seg.get("asr_confidence")
         if asr_confidence is not None:
             asr_conf = float(max(0.0, min(1.0, asr_confidence)))
             if asr_conf < 0.45:
                 importance_score -= (0.45 - asr_conf) * 0.35
 
-        # 4) Low-information / hallucination-like patterns
+        # Low-information / hallucination-like patterns
         if _is_low_reliability_text(text_lower):
             importance_score -= 0.12
 
@@ -300,7 +289,7 @@ def compute_importance(aligned_segments):
         if model_prob is not None:
             seg_with_score["model_importance_probability"] = model_prob
             seg_with_score["model_threshold"] = float(model_bundle.get("threshold", 0.5))
-            # Analysis field requested: keep base_importance_score as the raw model prob.
+            # Analysis field requested: keep base_importance_score as the raw model prob
             seg_with_score["base_importance_score"] = model_prob
 
         # Explainable prosody (for Prosodic Analysis Panel + XAI layer)
@@ -316,11 +305,16 @@ def compute_importance(aligned_segments):
         seg_with_score["energy_level"] = energy_level
         seg_with_score["pause_emphasis"] = pause_emphasis
 
-        # Human-readable explanation of why this segment was marked important.
+        # Human readable explanation of why this segment was marked important
         reasons = []
-        if model_prob is not None:
+        if model_prob is not None and fused_before_penalties is not None:
             reasons.append(
-                f"Supervised model probability={model_prob:.2f}; importance fused as 0.7*model_prob+0.3*rule_score={importance_score:.2f}, with reliability penalties applied."
+                "Supervised model probability="
+                f"{_format_float_for_importance_reason(model_prob)}; "
+                "fused raw score (0.7*model_prob+0.3*rule_score)="
+                f"{_format_float_for_importance_reason(fused_before_penalties)}; "
+                "after reliability penalties, importance_score="
+                f"{_format_float_for_importance_reason(importance_score)}."
             )
         else:
             reasons.extend(semantic_reasons)
@@ -341,7 +335,7 @@ def compute_importance(aligned_segments):
         if pause_emphasis:
             reasons.append("Pause emphasis detected before or after this segment (silence around it).")
 
-        # Keep previous urgency explanation for compatibility with existing UI wording.
+        # Keep previous urgency explanation for compatibility with existing UI wording
         text_for_urgency = text_lower
         if text_for_urgency and keyword_hits == 0:
             matched_urgency = sorted({kw for kw in _URGENCY_KEYWORDS if kw in text_for_urgency})

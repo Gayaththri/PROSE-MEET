@@ -1,6 +1,6 @@
 /**
  * Importance Timeline Heatmap: horizontal timeline of importance (Low / Medium / High).
- * Each segment is clickable; shows transcript, prosodic features, and explanation.
+ * Each segment is clickable; shows transcript and explanation.
  * Visualizes prosody importance for Gap 1.
  */
 import { useMemo, useState } from "react";
@@ -101,7 +101,7 @@ export default function ImportanceTimelineHeatmap({ transcript = [], durationSec
         Importance timeline
       </h3>
       <p className="saas-timeline-desc">
-        Click a segment to see transcript, prosodic features, and why it was marked important.
+        Click a segment to see transcript and why it was marked important.
       </p>
       <div className="saas-timeline-summary">
         <span className="saas-timeline-summary-item">Low {countsByLevel.Low}</span>
@@ -183,15 +183,6 @@ export default function ImportanceTimelineHeatmap({ transcript = [], durationSec
             </button>
           </div>
           <p className="saas-timeline-detail-transcript">{selectedSegment.text || selectedSegment.content || "(no text)"}</p>
-          <div className="saas-timeline-detail-prosody">
-            <span className="saas-timeline-detail-label">Prosodic features</span>
-            <div className="saas-timeline-detail-meta">
-              <span>Pitch variation: <strong>{selectedSegment.pitch_variation_level ?? "—"}</strong></span>
-              <span>Energy: <strong>{selectedSegment.energy_level ?? "—"}</strong></span>
-              <span>Pause emphasis: <strong>{selectedSegment.pause_emphasis ? "Yes" : "No"}</strong></span>
-              <span>Score: <strong>{(typeof selectedSegment.importance_score === "number" && Number.isFinite(selectedSegment.importance_score) ? selectedSegment.importance_score : 0).toFixed(2)}</strong></span>
-            </div>
-          </div>
           <div className="saas-timeline-detail-reasons">
             <span className="saas-timeline-detail-label">Why this segment</span>
             {(() => {

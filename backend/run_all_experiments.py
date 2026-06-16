@@ -38,19 +38,6 @@ def _pick_eval_dataset(repo_root: str) -> str:
     )
 
 
-def _pick_runtime_input(repo_root: str) -> str:
-    cand = os.path.join(repo_root, "data", "test_audio")
-    if os.path.isdir(cand):
-        return cand
-    rec = os.path.join(repo_root, "data", "recordings")
-    if os.path.isdir(rec):
-        return rec
-    raise FileNotFoundError(
-        "No runtime input folder found. Create data/test_audio or data/recordings with at least one "
-        "audio file, or skip runtime benchmark. See backend/data/templates/README.md."
-    )
-
-
 def main():
     parser = argparse.ArgumentParser(description="Run all Chapter 8 experiment scripts and collect artifacts.")
     parser.add_argument("--repo-root", default=".", help="Repository root")
@@ -64,111 +51,32 @@ def main():
     os.makedirs(run_dir, exist_ok=True)
 
     eval_data = _pick_eval_dataset(repo_root)
-    try:
-        runtime_input = _pick_runtime_input(repo_root)
-    except FileNotFoundError:
-        runtime_input = None
-        print("[warn] Skipping runtime benchmark (no data/test_audio or data/recordings).")
     model_dir = args.model_dir
 
     gap_eval_json = os.path.join(run_dir, "gap_eval.json")
     benchmark_json = os.path.join(run_dir, "benchmark.json")
     ablation_json = os.path.join(run_dir, "ablation.json")
-    runtime_json = os.path.join(run_dir, "runtime.json")
-    chapter8_md = os.path.join(run_dir, "chapter8_results.md")
-    figures_dir = os.path.join(run_dir, "figures")
 
     py = sys.executable
 
-    _run([py, "backend/evaluate_gaps.py", "--data", eval_data, "--output-json", gap_eval_json], cwd=repo_root)
+    _run([py, "backend/evaluation/evaluate_gaps.py", "--data", eval_data, "--output-json", gap_eval_json], cwd=repo_root)
 
-    bench_cmd = [py, "backend/benchmark_importance_models.py", "--data", eval_data, "--label-col", "label", "--output-json", benchmark_json]
+    bench_cmd = [py, "backend/evaluation/benchmark_importance_models.py", "--data", eval_data, "--label-col", "label", "--output-json", benchmark_json]
     if model_dir:
         bench_cmd += ["--model-dir", model_dir]
     _run(bench_cmd, cwd=repo_root)
 
-    abl_cmd = [py, "backend/ablation_gap1.py", "--data", eval_data, "--label-col", "label", "--output-json", ablation_json]
+    abl_cmd = [py, "backend/evaluation/ablation_gap1.py", "--data", eval_data, "--label-col", "label", "--output-json", ablation_json]
     if model_dir:
         abl_cmd += ["--model-dir", model_dir]
     _run(abl_cmd, cwd=repo_root)
 
-    if runtime_input:
-        _run([py, "backend/benchmark_runtime.py", "--inputs", runtime_input, "--output-json", runtime_json], cwd=repo_root)
-    else:
-        runtime_json = None
-
-    build_cmd = [
-        py,
-        "backend/build_results_tables.py",
-        "--gap-eval-json",
-        gap_eval_json,
-        "--benchmark-json",
-        benchmark_json,
-        "--ablation-json",
-        ablation_json,
-        "--output-md",
-        chapter8_md,
-    ]
-    if runtime_json:
-        build_cmd += ["--runtime-json", runtime_json]
-    _run(build_cmd, cwd=repo_root)
-
-    _run(
-        [
-            py,
-            "backend/plot_metrics.py",
-            "--gap-eval-json",
-            gap_eval_json,
-            "--ablation-json",
-            ablation_json,
-            "--benchmark-json",
-            benchmark_json,
-            "--output-dir",
-            figures_dir,
-        ],
-        cwd=repo_root,
-    )
-
-    functional_md = os.path.join(run_dir, "functional_test_report.md")
-    functional_csv = os.path.join(run_dir, "functional_test_results.csv")
-    nfr_md = os.path.join(run_dir, "nfr_test_report.md")
-    nfr_csv = os.path.join(run_dir, "nfr_test_results.csv")
-    _run(
-        [
-            py,
-            "backend/report_functional_tests.py",
-            "--repo-root",
-            repo_root,
-            "--output-md",
-            functional_md,
-            "--output-csv",
-            functional_csv,
-        ],
-        cwd=repo_root,
-    )
-    _run(
-        [
-            py,
-            "backend/nfr_tests.py",
-            "--repo-root",
-            repo_root,
-            "--output-md",
-            nfr_md,
-            "--output-csv",
-            nfr_csv,
-        ],
-        cwd=repo_root,
-    )
-
     print("\n=== Completed run_all_experiments ===")
     print(f"run_dir={run_dir}")
     print("key_artifacts:")
-    print(f"- {chapter8_md}")
-    print(f"- {os.path.join(figures_dir, 'confusion_matrix.png')}")
-    print(f"- {os.path.join(figures_dir, 'roc_curve.png')}")
-    print(f"- {os.path.join(figures_dir, 'pr_curve.png')}")
-    print(f"- {functional_md}")
-    print(f"- {nfr_md}")
+    print(f"- {gap_eval_json}")
+    print(f"- {benchmark_json}")
+    print(f"- {ablation_json}")
 
 
 if __name__ == "__main__":

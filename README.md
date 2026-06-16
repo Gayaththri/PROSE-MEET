@@ -2,72 +2,136 @@
 
 Meeting audio pipeline: transcription (faster-whisper), prosody, utterance importance, and summaries — with an optional web UI to upload/record audio and view results.
 
-## Prerequisites
+## Prerequisites (install before running)
 
-- **Python 3.x** — backend (ASR, importance, domain detection).
-- **Node.js** — frontend (Vite + React).
-- **FFmpeg** — required for audio/video conversion (the backend converts uploads to 16kHz mono WAV). Make sure `ffmpeg` is installed and available on your `PATH`.
-- **Optional:** [PostgreSQL](https://www.postgresql.org/download/) — persist meeting results (otherwise stored as JSON under `data/meetings/`).
-- **Optional:** [Hugging Face model access](https://huggingface.co/models) — only if you want to override the default Gap 2 sentence-transformer model via `PROSE_SSL_MODEL`.
+| Tool | Why | Notes |
+|------|-----|--------|
+| **Python** | Backend API and pipeline | **3.10+** recommended. Use `python --version`. On Windows, prefer **Python from [python.org](https://www.python.org/downloads/)** or the Microsoft Store so `python` and `pip` match. |
+| **Node.js** | Frontend build and dev server | **Current LTS** (e.g. 20.x or 22.x). Use `node --version` and `npm --version`. |
+| **FFmpeg** | Converts uploads to 16 kHz mono WAV | Must be on your **`PATH`**. Verify: `ffmpeg -version` (PowerShell/CMD/macOS/Linux). [Download FFmpeg](https://ffmpeg.org/download.html) if the command is not found. |
+| **Git** | Clone this repository | Optional if you already have the files. |
 
-## Quick start
+**Optional:**
 
-**1. Backend**
+- **[Hugging Face](https://huggingface.co/models)** — only if you override the default Gap 2 sentence-transformer via `PROSE_SSL_MODEL` in `.env`.
+
+**Disk and network:** First run may download Whisper and (if used) sentence-transformer weights — ensure several GB free and a stable connection.
+
+---
+
+## Setup: run the project locally
+
+Do these steps **in order** (backend first, then frontend in a second terminal).
+
+### 1. Backend (FastAPI)
+
+From the **repository root**:
 
 ```bash
 cd backend
-python -m pip install -r requirements.txt
-uvicorn main:app --reload
 ```
 
-To run backend tests: `python -m pip install -r requirements-dev.txt` then `python -m pytest tests -q` (see [backend/README.md](backend/README.md)).
+(Optional but recommended) create and use a virtual environment so Python packages stay isolated:
 
-API: **http://127.0.0.1:8000**
+```bash
+python -m venv .venv
+```
 
-**Backend configuration (recommended)**
-The backend loads environment variables from `backend/.env` (see `backend/.env.example`).
+- **Windows (PowerShell):** `.venv\Scripts\Activate.ps1`
+- **Windows (Command Prompt):** `.venv\Scripts\activate.bat`
+- **macOS / Linux:** `source .venv/bin/activate`
 
-From repo root:
+Install dependencies:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+**Environment file (recommended):** copy the example file and edit if needed.
+
+From repo root (PowerShell):
 
 ```powershell
 Copy-Item backend\.env.example backend\.env
 ```
 
-Or from `backend/`:
+Or from inside `backend/`:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Edit `backend/.env` to set (as needed):
-- `WHISPER_MODEL`
-- `DATABASE_URL` (PostgreSQL)
-- `BACKEND_CORS_ORIGINS`
-- `PROSE_DOMAIN_METHOD` (`ssl_zero_shot` or `keyword`)
-- `PROSE_SSL_MODEL` (optional sentence-transformer model id override)
+See [backend/.env.example](backend/.env.example) for `WHISPER_MODEL`, `BACKEND_CORS_ORIGINS`, and Gap 2 options. Defaults work for local dev; the first transcription may download a Whisper model.
 
-**2. Frontend** (separate terminal)
+**Start the API** — run this from the **`backend/`** directory (so `main:app` resolves correctly):
+
+```bash
+uvicorn main:app --reload
+```
+
+If `uvicorn` is not found on your `PATH` (common on Windows), use the same interpreter you used for `pip install`:
+
+```bash
+python -m uvicorn main:app --reload
+```
+
+- API base URL: **http://127.0.0.1:8000**
+- Interactive docs: **http://127.0.0.1:8000/docs**
+
+**Backend validation** (optional): run the evaluation scripts under `backend/evaluation/` and NFR checks in [backend/README.md](backend/README.md).
+
+### 2. Frontend (Vite + React)
+
+Open a **new terminal**. From the **repository root**:
 
 ```bash
 cd frontend/prose-meet-frontend
 npm ci
+```
+
+If you do not have `package-lock.json` or `npm ci` fails, use:
+
+```bash
+npm install
+```
+
+Start the dev server:
+
+```bash
 npm run dev
 ```
 
-Open the URL shown (e.g. **http://localhost:5173**). The UI talks to the backend at `http://127.0.0.1:8000`. For lint/build checks and `npm ci` vs `npm install`, see [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md).
+Open the URL printed in the terminal (usually **http://localhost:5173**). The UI calls the backend at **http://127.0.0.1:8000** by default.
+
+To point the UI at another API URL, set `VITE_API_BASE_URL` (see [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)).
+
+**Lint / production build** (optional):
+
+```bash
+npm run lint
+npm run build
+```
+
+---
+
+## Quick reference (experienced users)
+
+**Backend:** `cd backend` → `python -m pip install -r requirements.txt` → copy `.env.example` to `.env` → `uvicorn main:app --reload` (or `python -m uvicorn main:app --reload`)
+
+**Frontend:** `cd frontend/prose-meet-frontend` → `npm ci` (or `npm install`) → `npm run dev`
 
 ## Documentation
 
-- **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), PostgreSQL setup, deployment/production, and fine-tuned Whisper usage.
+- **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), deployment/production, and fine-tuned Whisper usage.
 - **[frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)** — Frontend setup and `VITE_API_BASE_URL` for configuring the backend API URL.
 
 ## Deployment
 
 For production or a hosted deployment:
 
-- **Backend:** Set `DATABASE_URL` to a PostgreSQL instance, configure `WHISPER_MODEL` (path or preset), and set `BACKEND_CORS_ORIGINS` to your frontend origin(s). See [backend/README.md](backend/README.md) § Deployment / production and `backend/.env.example`.
+- **Backend:** Configure `WHISPER_MODEL` (path or preset) and set `BACKEND_CORS_ORIGINS` to your frontend origin(s). See the **Deployment / production** section in [backend/README.md](backend/README.md) and `backend/.env.example`.
 - **Frontend:** Set `VITE_API_BASE_URL` to your backend API URL when building (`npm run build`). See [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md).
-- **Paths:** Recordings and meeting JSON (if not using PostgreSQL) live under `data/`; use a persistent volume or object store if needed.
+- **Paths:** Recordings and meeting JSON live under `data/`; use a persistent volume or object store if needed.
 
 ## Reproducibility
 
@@ -75,10 +139,11 @@ To regenerate Chapter 8 results and evaluation artifacts from a fresh clone:
 
 1. (Optional) Copy and fill `backend/data/importance_labels.csv` from `backend/data/templates/`, then run `python backend/train_importance_model.py --data backend/data/importance_labels.csv --label-col label` so the “Supervised” row is populated.
 2. From repo root: `python backend/run_all_experiments.py --repo-root . --output-root results`
-3. Outputs: timestamped dir under `results/` (gap_eval.json, benchmark.json, ablation.json, `chapter8_results.md`, `figures/` plots, test reports, etc.). Seed templates in `backend/data/templates/` are used for eval data if `backend/data/eval_dataset.csv` is missing.
+3. Outputs: timestamped dir under `results/` (gap_eval.json, benchmark.json, ablation.json, etc.). Seed templates in `backend/data/templates/` are used for eval data if `backend/data/eval_dataset.csv` is missing.
 
 ## Project layout
 
 - `backend/` — FastAPI app, faster-whisper ASR, importance/domain pipeline, evaluation scripts.
 - `frontend/prose-meet-frontend/` — React + Vite UI for upload/record and viewing transcripts, summaries, and highlights.
+- `data/` (repo root, gitignored) — Runtime data: `meetings/` (saved results JSON), `recordings/` (uploaded audio), optional `test_audio/` (sample audio for local runtime checks). Folders are created or refilled as you use the app; clearing `recordings/` and `test_audio/` does not break the UI (see [Smaller zip](#smaller-zip-for-submission-google-drive-etc)).
 - `backend/data/templates/` — Seed CSV/manifest templates; see `backend/data/templates/README.md` for running eval and experiments on a fresh clone.

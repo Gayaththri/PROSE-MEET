@@ -6,7 +6,7 @@ Minimal CSV and manifest layouts so new clones can run evaluation and `run_all_e
 
 | | **App / demo** | **Thesis tables (F1, accuracy, etc.)** |
 |---|----------------|----------------------------------------|
-| **What it means** | You run PROSE-MEET on audio and the UI shows importance + domain. | You have **numbers** in your report from `evaluate_gaps.py` (and optionally `evaluate_gap2_zeroshot.py`). |
+| **What it means** | You run PROSE-MEET on audio and the UI shows importance + domain. | You have **numbers** in your report from `evaluation/evaluate_gaps.py`. |
 | **What you need** | Working backend + upload. | A filled **`eval_dataset.csv`**: each row has **importance labels** (Gap 1); each **meeting** has **true domain** (Gap 2). Then run the eval scripts. |
 | **Gap 1 model** | Rules + prosody run without training. | Optional **supervised** model: train with `train_importance_model.py` on labelled CSV; otherwise report **rule-based** baseline only. |
 
@@ -29,7 +29,7 @@ Without labelled rows + eval runs, the **code is still complete** — only the *
    Gap 1 importance metrics in the generated tables will show "-" until you add a labeled eval dataset and optionally train a model (see backend README).
 
 2. **Use your own eval dataset:**  
-   Put your CSV at `backend/data/eval_dataset.csv` (or pass its path to `evaluate_gaps.py` / `run_all_experiments.py` via the scripts’ options).
+   Put your CSV at `backend/data/eval_dataset.csv` (or pass its path to `evaluation/evaluate_gaps.py` / `run_all_experiments.py` via the scripts’ options).
 
 3. **Train the importance model:**  
    Copy `importance_labels_template.csv` to `backend/data/importance_labels.csv`, fill with your labels, then:
@@ -37,16 +37,10 @@ Without labelled rows + eval runs, the **code is still complete** — only the *
    python backend/train_importance_model.py --data backend/data/importance_labels.csv --label-col label
    ```
 
-4. **Run full evaluation from a manifest:**  
-   Copy `manifests/custom.csv` to `data/manifests/custom.csv` (or create `data/manifests/` and point `--manifest` at it). Replace placeholder paths with real `audio_path`, `transcript_ref_path`, and `summary_ref_path`. Reference JSON can include per-utterance `important` for importance metrics. Then:
-   ```bash
-   python -m backend.evaluation.run_eval --manifest data/manifests/custom.csv --workspace-root . --output-root results
-   ```
-
 ## Note on importance metrics
 
-Chapter 8 and `RESULTS_SUMMARY.md` show "-" for importance (precision, recall, F1, AUC) when:
+Chapter 8 tables show "-" for importance (precision, recall, F1, AUC) when:
 - No labeled importance data is available (eval CSV without labels, or manifest references without per-utterance importance), or
 - No trained supervised model is present and the script only supports model-based Gap 1 evaluation.
 
-Once you add a proper `eval_dataset.csv` with importance labels (and optionally train the model), re-run the evaluation and table build to fill those cells.
+Once you add a proper `eval_dataset.csv` with importance labels (and optionally train the model), re-run evaluation to fill those cells.

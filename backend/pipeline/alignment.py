@@ -1,12 +1,9 @@
-"""Alignment helpers for transcript and prosody signals."""
+"""Align transcript segments with prosodic features using time"""
 
 import numpy as np
 
 
 def align_text_prosody(segments, prosody_features, sr=16000):
-    """
-    Align transcript segments with prosodic features using time boundaries.
-    """
 
     aligned_segments = []
 

@@ -86,7 +86,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (!processingSession?.fullJobId && !processingSession?.previewJobId) return undefined;
+    if (!processingSession?.fullJobId) return undefined;
 
     let stopped = false;
     const pollJobs = async () => {
@@ -94,26 +94,16 @@ function App() {
         const current = processingSessionRef.current;
         if (!current) return;
 
-        const [fullStatusData, previewStatusData] = await Promise.all([
-          current.fullJobId ? getJobStatus(current.fullJobId).catch((err) => {
-            console.error("Full job polling error:", err);
-            return null;
-          }) : Promise.resolve(null),
-          current.previewJobId ? getJobStatus(current.previewJobId).catch((err) => {
-            console.error("Preview job polling error:", err);
-            return null;
-          }) : Promise.resolve(null),
-        ]);
+        const fullStatusData = await getJobStatus(current.fullJobId).catch((err) => {
+          console.error("Full job polling error:", err);
+          return null;
+        });
         if (stopped) return;
 
         let fullResultData = null;
-        let previewResultData = null;
 
         if (fullStatusData?.status === "completed" && !current.fullResult) {
           fullResultData = await getMeetingResult(current.fullJobId);
-        }
-        if (previewStatusData?.status === "completed" && !current.previewResult) {
-          previewResultData = await getMeetingResult(current.previewJobId);
         }
         if (stopped) return;
 
@@ -127,18 +117,9 @@ function App() {
               next.partialResult = fullStatusData.partial_result;
             }
           }
-          if (previewStatusData) {
-            next.previewStatus = { ...prev.previewStatus, ...previewStatusData };
-            if (!next.previewResult && previewStatusData.partial_result) {
-              next.previewResult = previewStatusData.partial_result;
-            }
-          }
           if (fullResultData && !fullResultData.error) {
             next.fullResult = fullResultData;
             next.partialResult = fullResultData;
-          }
-          if (previewResultData && !previewResultData.error) {
-            next.previewResult = previewResultData;
           }
 
           return next;
@@ -154,7 +135,7 @@ function App() {
       stopped = true;
       clearInterval(interval);
     };
-  }, [processingSession?.fullJobId, processingSession?.previewJobId]);
+  }, [processingSession?.fullJobId]);
 
   useEffect(() => {
     if (!processingSession) return;
@@ -190,7 +171,7 @@ function App() {
   }, [processingSession, showCompletionNotice]);
 
   const liveResult = useMemo(
-    () => processingSession?.fullResult || processingSession?.partialResult || processingSession?.previewResult || null,
+    () => processingSession?.fullResult || processingSession?.partialResult || null,
     [processingSession],
   );
 
@@ -284,16 +265,11 @@ function App() {
     }
   };
 
-  const startProcessingSession = useCallback(async ({ fullJobId, previewJobId = null, previewEnabled = false, previewSeconds = null }) => {
+  const startProcessingSession = useCallback(async ({ fullJobId }) => {
     setProcessingSession({
       fullJobId,
-      previewJobId,
-      previewEnabled,
-      previewSeconds,
-      fullStatus: buildQueuedStatus({ is_preview: false }),
-      previewStatus: previewJobId ? buildQueuedStatus({ is_preview: true }) : null,
+      fullStatus: buildQueuedStatus(),
       partialResult: null,
-      previewResult: null,
       fullResult: null,
       notificationSent: false,
     });
@@ -306,7 +282,7 @@ function App() {
   const handleCancelProcessing = useCallback(() => {
     if (!processingSessionRef.current) return;
     const current = processingSessionRef.current;
-    const jobIds = [current.previewJobId, current.fullJobId].filter(Boolean);
+    const jobIds = [current.fullJobId].filter(Boolean);
     setProcessingSession((prev) => {
       if (!prev) return prev;
       return {
@@ -317,14 +293,6 @@ function App() {
           cancel_requested: true,
           stage_label: "Cancelling",
         },
-        previewStatus: prev.previewStatus
-          ? {
-              ...prev.previewStatus,
-              status: "cancelling",
-              cancel_requested: true,
-              stage_label: "Cancelling",
-            }
-          : null,
       };
     });
     void Promise.allSettled(jobIds.map((jobId) => cancelJob(jobId))).catch(() => {});

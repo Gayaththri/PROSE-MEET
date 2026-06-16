@@ -1,4 +1,4 @@
-"""In-memory job lifecycle management for async tasks."""
+"""Backend job tracker"""
 
 import copy
 import json
@@ -13,10 +13,6 @@ jobs_lock = threading.Lock()
 MEETINGS_DIR = os.path.join(os.path.dirname(__file__), "..", "data", "meetings")
 _BACKEND_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 _RECORDINGS_ROOT = os.path.abspath(os.path.join(_BACKEND_ROOT, "data", "recordings"))
-
-
-def _use_postgres():
-    return bool(os.getenv("DATABASE_URL"))
 
 
 def _ensure_meetings_dir():
@@ -43,13 +39,9 @@ def resolve_recording_path(recording_path: str):
     except Exception:
         return None
 
-
+#Builds initial template for every new job
 def _create_job_state(
     filename=None,
-    preview=False,
-    preview_seconds=None,
-    related_job_id=None,
-    persist_result=True,
 ):
     timestamp = _now_iso()
     return {
@@ -62,31 +54,21 @@ def _create_job_state(
         "progress": 0.0,
         "eta_seconds": None,
         "started_at": timestamp,
+        "processing_started_at": None,
+        "audio_duration_seconds": None,
         "updated_at": timestamp,
         "cancel_requested": False,
         "filename": filename or "meeting",
-        "preview": bool(preview),
-        "preview_seconds": preview_seconds,
-        "related_job_id": related_job_id,
-        "persist_result": bool(persist_result),
     }
 
-
+#Creates a new job 
 def create_job(
     filename=None,
-    preview=False,
-    preview_seconds=None,
-    related_job_id=None,
-    persist_result=True,
 ):
     job_id = str(uuid.uuid4())
     with jobs_lock:
         jobs[job_id] = _create_job_state(
             filename=filename,
-            preview=preview,
-            preview_seconds=preview_seconds,
-            related_job_id=related_job_id,
-            persist_result=persist_result,
         )
     return job_id
 
@@ -95,6 +77,12 @@ def update_job(job_id, **updates):
     with jobs_lock:
         if job_id not in jobs:
             return None
+        if updates.get("status") == "processing":
+            if (
+                jobs[job_id].get("processing_started_at") is None
+                and "processing_started_at" not in updates
+            ):
+                updates = {**updates, "processing_started_at": _now_iso()}
         jobs[job_id].update(updates)
         jobs[job_id]["updated_at"] = _now_iso()
         return copy.deepcopy(jobs[job_id])
@@ -127,14 +115,18 @@ def update_job_status(job_id, status, **extra):
         payload.setdefault("eta_seconds", 0.0)
     return update_job(job_id, **payload)
 
+# When omitted, leave existing eta_seconds on the job unchanged.
+_ETA_SECONDS_OMIT = object()
 
+
+# live progress updates
 def update_job_progress(
     job_id,
     *,
     stage=None,
     stage_label=None,
     progress=None,
-    eta_seconds=None,
+    eta_seconds=_ETA_SECONDS_OMIT,
     partial_result=None,
     status=None,
     **extra,
@@ -148,8 +140,11 @@ def update_job_progress(
         payload["stage_label"] = stage_label
     if progress is not None:
         payload["progress"] = float(max(0.0, min(1.0, progress)))
-    if eta_seconds is not None:
-        payload["eta_seconds"] = float(max(0.0, eta_seconds))
+    if eta_seconds is not _ETA_SECONDS_OMIT:
+        if eta_seconds is None:
+            payload["eta_seconds"] = None
+        else:
+            payload["eta_seconds"] = float(max(0.0, eta_seconds))
     if partial_result is not None:
         payload["partial_result"] = partial_result
     return update_job(job_id, **payload)
@@ -157,10 +152,6 @@ def update_job_progress(
 
 def set_partial_result(job_id, partial_result):
     return update_job(job_id, partial_result=partial_result)
-
-
-def set_related_job(job_id, related_job_id):
-    return update_job(job_id, related_job_id=related_job_id)
 
 
 def request_job_cancel(job_id):
@@ -223,16 +214,8 @@ def complete_job(job_id, result, filename=None, persist_result=True):
 
 
 def save_meeting(job_id, result, filename=None):
-    """Persist meeting to PostgreSQL (if DATABASE_URL set) or fallback to JSON files."""
-    if _use_postgres():
-        try:
-            from database import save_meeting_to_db
-            save_meeting_to_db(job_id, result, filename=filename)
-        except Exception as e:
-            # Fallback to file if DB fails (e.g. connection error)
-            _save_meeting_file(job_id, result, filename=filename)
-    else:
-        _save_meeting_file(job_id, result, filename=filename)
+    """Persist meeting as JSON under data/meetings/."""
+    _save_meeting_file(job_id, result, filename=filename)
 
 
 def _save_meeting_file(job_id, result, filename=None):
@@ -264,13 +247,7 @@ def get_job(job_id):
 
 
 def list_meetings():
-    """Return saved meetings (PostgreSQL or file) sorted by created_at descending."""
-    if _use_postgres():
-        try:
-            from database import list_meetings_from_db
-            return list_meetings_from_db()
-        except Exception:
-            pass
+    """Return saved meetings from JSON files, sorted by created_at descending."""
     _ensure_meetings_dir()
     out = []
     for name in os.listdir(MEETINGS_DIR):
@@ -294,19 +271,11 @@ def list_meetings():
 
 
 def get_meeting_result(job_id):
-    """Load meeting result from memory, then PostgreSQL or file."""
+    """Load meeting result from memory, then from JSON file."""
     with jobs_lock:
         job = jobs.get(job_id)
         if job and job.get("status") == "completed" and job.get("result"):
             return job["result"]
-    if _use_postgres():
-        try:
-            from database import get_meeting_result_from_db
-            result = get_meeting_result_from_db(job_id)
-            if result is not None:
-                return result
-        except Exception:
-            pass
     path = os.path.join(MEETINGS_DIR, f"{job_id}.json")
     if not os.path.isfile(path):
         return None
@@ -324,30 +293,20 @@ def get_meeting_result(job_id):
 
 def delete_meeting(job_id: str):
     """
-    Delete a saved meeting from PostgreSQL or file storage.
-    Also removes the associated recording file if present.
+    Delete a saved meeting JSON file and remove the associated recording if present.
     """
     # Load result once so we can clean up the recording afterwards.
     result = get_meeting_result(job_id)
 
     removed = False
-    if _use_postgres():
+    path = os.path.join(MEETINGS_DIR, f"{job_id}.json")
+    if os.path.isfile(path):
         try:
-            from database import delete_meeting_from_db
-            removed = delete_meeting_from_db(job_id)
+            os.remove(path)
+            removed = True
         except Exception:
             removed = False
-    else:
-        path = os.path.join(MEETINGS_DIR, f"{job_id}.json")
-        if os.path.isfile(path):
-            try:
-                os.remove(path)
-                removed = True
-            except Exception:
-                removed = False
 
-    # Best-effort cleanup of the original recording file (if we know it).
-    # Only remove the recording when meeting deletion succeeded.
     if removed and result:
         recording_path = result.get("recording_path")
         if recording_path:
@@ -358,7 +317,6 @@ def delete_meeting(job_id: str):
                 except Exception:
                     pass
 
-    # Also clear from in-memory jobs map if present.
     with jobs_lock:
         jobs.pop(job_id, None)
 

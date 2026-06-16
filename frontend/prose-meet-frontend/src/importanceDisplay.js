@@ -1,6 +1,6 @@
 /**
  * Shared transcript importance thresholds and display labels (quartile + semantic guardrails).
- * Used by MeetingInsights and ImportanceTimelineHeatmap — keep in sync in one place.
+ * Used by MeetingInsights and ImportanceTimelineHeatmap keep in sync in one place.
  */
 import { sanitizeImportanceReasons } from "./reasonFilters";
 
@@ -142,7 +142,6 @@ function isNonSubstantiveChatterSegment(seg) {
   }
 
   const words = text.split(/\s+/).filter(Boolean);
-  // Likely "I'm <Name> ..." intro lines (short and proper-noun looking).
   const looksLikeNameIntro =
     /\bi['\u2019]?m\s+[a-z]+(?:\s+[a-z]+){1,2}\b/.test(text) && words.length <= 12;
   if (looksLikeNameIntro) {

@@ -5,10 +5,15 @@ import csv
 import json
 import os
 import re
+import sys
 from typing import Dict, List, Tuple
 
 import numpy as np
 from sklearn.metrics import precision_recall_curve, precision_recall_fscore_support, roc_auc_score
+
+_BACKEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if _BACKEND_DIR not in sys.path:
+    sys.path.insert(0, _BACKEND_DIR)
 
 from pipeline.importance_model import load_model, predict_probabilities
 

@@ -19,25 +19,6 @@ uvicorn main:app --reload
 
 API: `http://127.0.0.1:8000`
 
-### Tests
-
-```bash
-python -m pip install -r requirements-dev.txt
-python -m pytest tests -q
-```
-
-### Manual Gap 1 smoke script
-
-`test_gap1.py` runs the full pipeline on a local WAV (not part of pytest). Default file: `<repo-root>/data/test_audio/meeting.wav` (create that folder and add a sample, or pass a path).
-
-```bash
-cd backend
-python test_gap1.py
-python test_gap1.py --audio path/to/meeting.wav
-```
-
----
-
 ## Supervised importance model (prosody + semantics)
 
 The pipeline can use a trained utterance-level classifier for importance scoring.  
@@ -65,7 +46,7 @@ python train_importance_model.py --data data/importance_labels.csv --label-col l
 ### Recalibrate threshold only
 
 ```bash
-python calibrate_importance_threshold.py --data data/importance_labels_val.csv --label-col label
+# Threshold is stored in `backend/models/importance_classifier_meta.json` when the model is trained.
 ```
 
 ### Evaluate Gap 1 + Gap 2 (single script)
@@ -75,33 +56,14 @@ Run one evaluation pass for:
 - Gap 2: meeting domain detection accuracy
 
 ```bash
-python evaluate_gaps.py --data data/eval_dataset.csv
+python evaluation/evaluate_gaps.py --data data/eval_dataset.csv
 ```
 
 To save machine-readable output:
 
 ```bash
-python evaluate_gaps.py --data data/eval_dataset.csv --output-json data/experiments/gap_eval.json
+python evaluation/evaluate_gaps.py --data data/eval_dataset.csv --output-json data/experiments/gap_eval.json
 ```
-
-### Evaluate Gap 2 zero-shot generalisation (corporate -> other domains)
-
-This is the direct proof setup for Gap 2:
-- Train on one domain only (default: `corporate`)
-- Evaluate same-domain baseline
-- Evaluate cross-domain before adaptation
-- Evaluate cross-domain after domain adaptation
-
-```bash
-python evaluate_gap2_zeroshot.py --data data/eval_dataset.csv --train-domain corporate --output-json data/experiments/gap2_zeroshot.json
-```
-
-The script prints and saves three scenario metrics:
-- `same_domain_baseline` (corporate test split)
-- `cross_domain_no_adaptation`
-- `cross_domain_with_adaptation`
-
-Use these directly in your report table to demonstrate zero-shot transfer without retraining.
 
 Expected CSV columns:
 - Required for Gap 1: `text`, one of `label` / `importance_label` / `important`
@@ -111,43 +73,19 @@ Expected CSV columns:
 ### Benchmark rule-based vs supervised importance
 
 ```bash
-python benchmark_importance_models.py --data data/eval_dataset.csv --label-col label
+python evaluation/benchmark_importance_models.py --data data/eval_dataset.csv --label-col label
 ```
 
 To save machine-readable output:
 
 ```bash
-python benchmark_importance_models.py --data data/eval_dataset.csv --label-col label --output-json data/experiments/benchmark.json
+python evaluation/benchmark_importance_models.py --data data/eval_dataset.csv --label-col label --output-json data/experiments/benchmark.json
 ```
 
 ### Gap 1 ablation (prosody vs semantics vs fusion)
 
 ```bash
-python ablation_gap1.py --data data/eval_dataset.csv --label-col label --output-json data/experiments/ablation.json
-```
-
-### Runtime benchmark (end-to-end pipeline)
-
-```bash
-python benchmark_runtime.py --inputs ../data/test_audio --output-json data/experiments/runtime.json
-```
-
-### Reproducible experiment logging
-
-1. Copy and edit config:
-   - `configs/experiment.template.json`
-2. Run:
-
-```bash
-python run_experiment.py --config configs/experiment.template.json
-```
-
-This appends one JSON line per run to `data/experiments/runs.jsonl` for chapter-wise reporting.
-
-### Build Chapter 8 markdown tables
-
-```bash
-python build_results_tables.py --gap-eval-json data/experiments/gap_eval.json --benchmark-json data/experiments/benchmark.json --ablation-json data/experiments/ablation.json --runtime-json data/experiments/runtime.json --output-md results/chapter8_results.md
+python evaluation/ablation_gap1.py --data data/eval_dataset.csv --label-col label --output-json data/experiments/ablation.json
 ```
 
 ### Dataset templates (seed data)
@@ -157,11 +95,11 @@ Starter templates are committed under **`backend/data/templates/`** so new clone
 - `backend/data/templates/eval_dataset_template.csv` — Gap 1 + Gap 2 eval (copy to `backend/data/eval_dataset.csv` or use as-is; scripts fall back to this path)
 - `backend/data/templates/importance_labels_template.csv` — Training data for the importance model
 - `backend/data/templates/importance_labels_val_template.csv` — Validation data for threshold calibration
-- `backend/data/templates/manifests/custom.csv` — Manifest layout for `run_eval` (replace paths with your audio and reference files)
+- `backend/data/templates/manifests/custom.csv` — Manifest layout template (replace paths with your audio and reference files)
 
 See **`backend/data/templates/README.md`** for quick start and copying instructions.
 
-**Importance metrics in results:** Chapter 8 tables and `evaluation/RESULTS_SUMMARY.md` show "-" for importance (samples, precision, recall, F1, AUC) and for the "Supervised" row when:
+**Importance metrics in results:** Chapter 8 tables show "-" for importance (samples, precision, recall, F1, AUC) and for the "Supervised" row when:
 - No labeled importance data is available (eval CSV without labels, or manifest references without per-utterance importance), or
 - No trained model is present (Gap 1 evaluation and supervised benchmark require a model in `backend/models/`).
 
@@ -177,74 +115,9 @@ Saved artifacts (when trained):
 
 Optional environment variables:
 
-- `ANONYMIZE_TRANSCRIPTS=1`
-  - Masks emails/phone numbers/student-style IDs in transcript, summary, highlights, and speaker summaries before save.
 - `MEETING_CONSENT_STATUS=<status>`
   - Example values: `obtained`, `pending`, `not_provided`.
   - Saved under `result["consent"]`.
-
----
-
-## Test suite
-
-```bash
-python -m unittest discover -s tests -p "test_*.py"
-```
-
-Includes:
-- Unit tests for importance/domain/highlight behavior.
-- API integration test for `/run-gap1` -> `/status/{job_id}` -> `/result/{job_id}` flow.
-
----
-
-## Reproducible Evaluation Package
-
-Evaluation code lives under:
-- `backend/evaluation/run_eval.py`
-- `backend/evaluation/datasets.py`
-- `backend/evaluation/metrics.py`
-- `backend/evaluation/report.py`
-
-Run full experiment from a manifest:
-
-```bash
-python -m backend.evaluation.run_eval --manifest data/manifests/custom.csv --workspace-root . --output-root results
-```
-
-Outputs are saved to `results/<timestamp>/`:
-- `config.json`
-- `per_meeting.csv`
-- `aggregate.json`
-- `ablation.csv`
-- `cross_domain.csv`
-- `RESULTS_SUMMARY.md`
-
-Manifest templates: copy from `backend/data/templates/manifests/custom.csv` to `data/manifests/custom.csv` (or create your own); replace placeholder paths with real audio and reference paths.
-
-Required manifest columns:
-- `id,audio_path,transcript_ref_path,summary_ref_path,domain,split`
-
-Additional evaluation utilities:
-
-1. Inter-annotator agreement (Cohen's kappa):
-```bash
-python -m backend.evaluation.kappa_eval --labels-csv data/annotations/iaa_labels.csv --output-json results/iaa_kappa.json
-```
-
-2. Paired significance test (t-test + Wilcoxon + bootstrap CI):
-```bash
-python -m backend.evaluation.stats_significance --csv-a results/run_a/per_meeting.csv --csv-b results/run_b/per_meeting.csv --id-col id --metric-a importance_f1 --metric-b importance_f1 --output-json results/significance.json
-```
-
-3. PR curves + confusion matrices:
-```bash
-python -m backend.evaluation.plot_curves --data backend/data/eval_dataset.csv --label-col label --output-dir results/curves
-```
-
-4. Error-case report from per-meeting outputs:
-```bash
-python -m backend.evaluation.error_cases_report --per-meeting-csv results/<timestamp>/per_meeting.csv --output-dir results/<timestamp> --top-n 10
-```
 
 ---
 
@@ -265,38 +138,9 @@ python backend/run_all_experiments.py --repo-root . --output-root results
 ```
 
 This runs in sequence:
-- `evaluate_gaps.py`
-- `benchmark_importance_models.py`
-- `ablation_gap1.py`
-- `benchmark_runtime.py`
-- `build_results_tables.py`
-- `plot_metrics.py`
-- `report_functional_tests.py`
-- `nfr_tests.py`
-
-### 3) Plot generation from JSON outputs
-
-```bash
-python backend/plot_metrics.py --gap-eval-json results/<timestamp>/gap_eval.json --ablation-json results/<timestamp>/ablation.json --benchmark-json results/<timestamp>/benchmark.json --output-dir results/figures
-```
-
-Generates:
-- `results/figures/confusion_matrix.png`
-- `results/figures/roc_curve.png`
-- `results/figures/pr_curve.png`
-
-### 4) Functional and non-functional test reports
-
-```bash
-python backend/report_functional_tests.py --repo-root .
-python backend/nfr_tests.py --repo-root .
-```
-
-Generates (default paths under repo root):
-- `results/functional_test_report.md`
-- `results/functional_test_results.csv`
-- `results/nfr_test_report.md`
-- `results/nfr_test_results.csv`
+- `evaluation/evaluate_gaps.py`
+- `evaluation/benchmark_importance_models.py`
+- `evaluation/ablation_gap1.py`
 
 ### Required file formats
 
@@ -313,7 +157,7 @@ Generates (default paths under repo root):
 - If manifests point to missing files:
   - run `backend/validate_manifests.py` and fix listed paths; use `backend/data/templates/manifests/` as reference.
 - If supervised model is missing:
-  - benchmark/ablation run with rule-based outputs; Gap 1 in `evaluate_gaps.py` and the "Supervised" row in tables show "-" until you train a model. See "Dataset templates (seed data)" above.
+  - benchmark/ablation run with rule-based outputs; Gap 1 in `evaluation/evaluate_gaps.py` and the "Supervised" row in tables show "-" until you train a model. See "Dataset templates (seed data)" above.
 
 ---
 
@@ -325,7 +169,6 @@ For production or a deployed environment, configure the following.
 
 See `backend/.env.example`. Key ones:
 
-- **`DATABASE_URL`** — PostgreSQL connection string. If unset, meetings are stored as JSON under `data/meetings/` (not suitable for multi-process or high durability).
 - **`WHISPER_MODEL`** — Preset name (`tiny`, `small`, `large-v3`, …) or absolute path to a CTranslate2 model directory. Ensure the path is valid on the deployment host.
 - **`BACKEND_CORS_ORIGINS`** — Comma-separated list of allowed frontend origins (CORS). Default includes common Vite dev URLs (`http://localhost:5173`, `http://localhost:5174`, and the same ports on `127.0.0.1`). If the UI is served from another origin (e.g. `https://app.example.com`), set this to that origin (and any dev origins you need), e.g. `https://app.example.com,http://localhost:5173`.
 
@@ -340,38 +183,10 @@ BACKEND_CORS_ORIGINS=https://meet.example.com,http://localhost:5173
 ### File and storage paths
 
 - **`data/recordings/`** — Original uploaded audio files (relative to repo root; backend resolves via `RECORDINGS_DIR`). Use a persistent volume or object store in production if you need to keep recordings.
-- **`data/meetings/`** — JSON fallback when `DATABASE_URL` is unset. Prefer PostgreSQL for production.
+- **`data/meetings/`** — Saved meeting results as JSON (one file per meeting). Use a persistent volume in production if you need results to survive restarts.
 - **`temp_audio/`** — Temporary uploads during processing; can be ephemeral.
 
-Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not expose secrets (e.g. `DATABASE_URL`) in version control; use the environment or a secrets manager.
-
----
-
-## PostgreSQL storage (recommended)
-
-Meeting results (summary, transcript, highlights, speakers) are persisted so they survive reloads and server restarts. With **PostgreSQL** they are stored in a database (research-grade); without it they fall back to JSON files in `data/meetings/`.
-
-### Setup
-
-1. Install and run PostgreSQL (e.g. [PostgreSQL downloads](https://www.postgresql.org/download/) or Docker: `docker run -d -p 5432:5432 -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=prose_meet postgres:16`).
-
-2. Create a database (if not using Docker above):
-   ```sql
-   CREATE DATABASE prose_meet;
-   ```
-
-3. In `backend/.env` (or your environment), set:
-   ```env
-   DATABASE_URL=postgresql://USER:PASSWORD@HOST:5432/prose_meet
-   ```
-   Example (local, user `postgres`, password `postgres`):
-   ```env
-   DATABASE_URL=postgresql://postgres:postgres@localhost:5432/prose_meet
-   ```
-
-4. Restart the backend. On startup you should see: `PostgreSQL: tables ready.` The `meetings` table (id UUID, filename, created_at, result JSONB) is created automatically.
-
-If `DATABASE_URL` is not set, the app still runs and saves meetings to `data/meetings/` as JSON files.
+Run the backend behind a reverse proxy (nginx, Caddy, etc.) with HTTPS. Do not expose secrets in version control; use the environment or a secrets manager.
 
 ---
 

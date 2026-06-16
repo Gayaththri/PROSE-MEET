@@ -33,7 +33,6 @@ export default function ProcessingStatusCard({
   if (!session) return null;
 
   const fullStatus = session.fullStatus || {};
-  const previewStatus = session.previewStatus || {};
   const progress = Math.max(
     0,
     Math.min(100, Math.round((fullStatus.progress ?? 0) * 100)),
@@ -42,11 +41,7 @@ export default function ProcessingStatusCard({
   const activeStepIndex = getActiveStepIndex(stage);
   const fullDone = ["completed", "failed", "cancelled"].includes(fullStatus.status);
   const fullCancelling = fullStatus.status === "cancelling";
-  const previewEnabled = Boolean(session.previewJobId);
-  const previewReady = previewStatus.status === "completed";
-  const previewRunning =
-    previewEnabled && !["completed", "failed", "cancelled", "cancelling"].includes(previewStatus.status);
-  const hasLivePreview = Boolean(session.previewResult || session.partialResult || session.fullResult);
+  const hasLivePreview = Boolean(session.partialResult || session.fullResult);
 
   if (compact) {
     return (
@@ -63,8 +58,6 @@ export default function ProcessingStatusCard({
             {progress}% complete
             {" - "}
             {fullDone ? "Ready to review" : fullCancelling ? "Stopping" : formatEta(fullStatus.eta_seconds)}
-            {previewRunning ? " - Quick preview running" : ""}
-            {previewReady ? " - Quick preview ready" : ""}
           </p>
         </div>
         <div className="saas-processing-banner-actions">
@@ -148,22 +141,6 @@ export default function ProcessingStatusCard({
           );
         })}
       </ol>
-
-      {previewEnabled && (
-        <div className="saas-status">
-          <span className="saas-status-dot" aria-hidden />
-          <div>
-            <p className="saas-status-title">Quick preview mode</p>
-            <p className="saas-status-desc">
-              {previewReady
-                ? "A preview is ready while the full analysis continues."
-                : previewRunning
-                  ? "Generating a fast preview from the first moments of the meeting."
-                  : "Preview is linked to this full analysis session."}
-            </p>
-          </div>
-        </div>
-      )}
 
       <div className="saas-processing-actions">
         {hasLivePreview && onOpenLive && (

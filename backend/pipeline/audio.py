@@ -1,4 +1,4 @@
-"""Audio preprocessing utilities for the pipeline."""
+"""Converts raw meeting audio into a clean, consistent signal for ASR/prosody steps."""
 
 import librosa
 import numpy as np
@@ -6,9 +6,6 @@ import soundfile as sf
 
 
 def preprocess_audio(audio_path: str, target_sr: int = 16000):
-    """
-    Loads meeting audio, converts it to mono 16 kHz, and normalizes amplitude for downstream ASR/prosody processing.
-    """
 
     try:
         audio, sr = sf.read(audio_path, dtype="float32", always_2d=False)

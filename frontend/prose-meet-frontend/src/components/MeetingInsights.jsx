@@ -54,12 +54,6 @@ export default function MeetingInsights({ result, onBack, loading = false }) {
   const [advancedInsightsReadyKey, setAdvancedInsightsReadyKey] = useState(null);
   const meetingTitle = (result?.filename || "Meeting").replace(/\.[^/.]+$/, "") || "Meeting";
   const advancedInsightsKey = `${result?.job_id || "current"}:${result?.partial_stage || "base"}`;
-  const previewNote =
-    result?.is_preview && !result?.domain
-      ? "Quick preview from the first part of the meeting. Full insights will replace this automatically."
-      : result?.is_preview
-        ? "Quick preview mode is showing a provisional snapshot while the full analysis continues."
-        : null;
 
   const showAdvancedInsights = hasTranscript && advancedInsightsReadyKey === advancedInsightsKey;
 
@@ -99,16 +93,6 @@ export default function MeetingInsights({ result, onBack, loading = false }) {
           ) : null
         }
       />
-
-      {previewNote && (
-        <div className="saas-status">
-          <span className="saas-status-dot" aria-hidden />
-          <div>
-            <p className="saas-status-title">Quick preview</p>
-            <p className="saas-status-desc">{previewNote}</p>
-          </div>
-        </div>
-      )}
 
       <div className="saas-results-stack">
         <section className="saas-results-section">

@@ -2,21 +2,20 @@
 Runs the main Gap 1 meeting pipeline end-to-end with progress updates: audio preprocessing, ASR+prosody, alignment, importance scoring, domain adaptation, highlights, speaker insights, and summary output.
 """
 import concurrent.futures
+import time
 
 from .audio import preprocess_audio
-from .asr import transcribe_audio
+from .asr import transcribe_audio, uses_cuda
 from .prosody import extract_prosody
 from .alignment import align_text_prosody
 from .importance import compute_importance
 from .summary import generate_summary, generate_speaker_summaries, top_substantive_highlights
-from .speakers import compute_speaker_contribution
 from .domain import (
     detect_domain,
     apply_domain_adaptation,
     get_domain_focus_keywords,
     get_domain_importance_threshold,
 )
-from .timing import TimingCollector, timed_stage
 from .job_control import JobCancelledError
 
 
@@ -25,7 +24,15 @@ def _check_cancel(cancel_checker):
         raise JobCancelledError("Processing cancelled by user.")
 
 
-def _emit_progress(progress_callback, *, stage, stage_label, progress, partial_result=None):
+def _emit_progress(
+    progress_callback,
+    *,
+    stage,
+    stage_label,
+    progress,
+    partial_result=None,
+    audio_duration_seconds=None,
+):
     if progress_callback is None:
         return
     progress_callback(
@@ -33,6 +40,7 @@ def _emit_progress(progress_callback, *, stage, stage_label, progress, partial_r
         stage_label=stage_label,
         progress=progress,
         partial_result=partial_result,
+        audio_duration_seconds=audio_duration_seconds,
     )
 
 
@@ -44,7 +52,6 @@ def _build_partial_result(
     summary=None,
     speaker_summaries=None,
     domain=None,
-    speakers=None,
     importance_threshold=None,
     metadata=None,
     partial_stage=None,
@@ -54,7 +61,6 @@ def _build_partial_result(
         "duration_seconds": duration_seconds,
         "highlights": highlights or [],
         "speaker_summaries": speaker_summaries or [],
-        "speakers": speakers or [],
         "importance_threshold": importance_threshold,
         "summary": summary,
         "domain": domain,
@@ -68,66 +74,111 @@ def _build_partial_result(
 
 def run_gap1(
     audio_path: str,
-    timing_collector: TimingCollector | None = None,
+    timing_collector=None,
     progress_callback=None,
     cancel_checker=None,
     result_metadata=None,
 ) -> dict:
-   
+    _check_cancel(cancel_checker)
+    # Preprocess audio once (mono, 16 kHz, normalised) for prosody extraction
+    audio, sr = preprocess_audio(audio_path)
+    duration_seconds = float(len(audio) / sr) if sr > 0 and len(audio) > 0 else 0.0
+    _check_cancel(cancel_checker)
+    # Emit first progress only after we know duration so ETA can use a length-based budget
+    # (avoids implying a seconds-left estimate with no audio length).
     _emit_progress(
         progress_callback,
         stage="preparing_audio",
         stage_label="Preparing audio",
         progress=0.08,
+        audio_duration_seconds=duration_seconds,
     )
     _check_cancel(cancel_checker)
-    # Preprocess audio once (mono, 16 kHz, normalised) for prosody extraction
-    with timed_stage(timing_collector, "preprocess_audio"):
-        audio, sr = preprocess_audio(audio_path)
-    duration_seconds = float(len(audio) / sr) if sr > 0 and len(audio) > 0 else 0.0
-    _check_cancel(cancel_checker)
 
-    # Run ASR and prosody extraction in parallel to reduce total time
+    # Run ASR + prosody in parallel on CUDA, but avoid CPU over-saturation on CPU-only hosts.
     _emit_progress(
         progress_callback,
         stage="transcribing",
         stage_label="Transcribing meeting",
         progress=0.26,
+        audio_duration_seconds=duration_seconds,
     )
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
-    hard_shutdown = False
-    try:
-        future_asr = executor.submit(
-            transcribe_audio, audio_path, "en", timing_collector, cancel_checker
+    asr_prog_state = {"p": 0.26, "t": 0.0}
+
+    def _asr_segment_progress(through_audio: float) -> None:
+        frac = max(0.0, min(1.0, float(through_audio)))
+        p = 0.26 + (0.42 - 0.26) * frac
+        now = time.monotonic()
+        if (
+            frac < 0.997
+            and p - asr_prog_state["p"] < 0.014
+            and (now - asr_prog_state["t"]) < 0.3
+        ):
+            return
+        asr_prog_state["p"] = p
+        asr_prog_state["t"] = now
+        _emit_progress(
+            progress_callback,
+            stage="transcribing",
+            stage_label="Transcribing meeting",
+            progress=p,
+            audio_duration_seconds=duration_seconds,
         )
-        future_prosody = executor.submit(
-            extract_prosody, audio, sr, timing_collector, cancel_checker
-        )
-        pending = {future_asr, future_prosody}
-        while pending:
-            done, pending = concurrent.futures.wait(
-                pending,
-                timeout=0.5,
-                return_when=concurrent.futures.FIRST_COMPLETED,
+
+    if uses_cuda():
+        executor = concurrent.futures.ThreadPoolExecutor(max_workers=2)
+        hard_shutdown = False
+        try:
+            future_asr = executor.submit(
+                transcribe_audio,
+                audio_path,
+                "en",
+                timing_collector,
+                cancel_checker,
+                audio_duration_seconds=duration_seconds,
+                segment_progress_callback=_asr_segment_progress,
             )
-            try:
-                _check_cancel(cancel_checker)
-            except JobCancelledError:
-                hard_shutdown = True
-                executor.shutdown(wait=False)
-                raise
-            for f in done:
+            future_prosody = executor.submit(
+                extract_prosody, audio, sr, timing_collector, cancel_checker
+            )
+            pending = {future_asr, future_prosody}
+            while pending:
+                done, pending = concurrent.futures.wait(
+                    pending,
+                    timeout=0.5,
+                    return_when=concurrent.futures.FIRST_COMPLETED,
+                )
                 try:
-                    f.result()
+                    _check_cancel(cancel_checker)
                 except JobCancelledError:
                     hard_shutdown = True
                     executor.shutdown(wait=False)
                     raise
-        segments = future_asr.result()
-        prosody = future_prosody.result()
-    finally:
-        if not hard_shutdown:
-            executor.shutdown(wait=True)
+                for f in done:
+                    try:
+                        f.result()
+                    except JobCancelledError:
+                        hard_shutdown = True
+                        executor.shutdown(wait=False)
+                        raise
+            segments = future_asr.result()
+            prosody = future_prosody.result()
+        finally:
+            if not hard_shutdown:
+                executor.shutdown(wait=True)
+    else:
+        # On CPU, faster-whisper already uses many threads; running prosody concurrently
+        # can starve ASR and appear stuck at the transcribing stage.
+        segments = transcribe_audio(
+            audio_path,
+            "en",
+            timing_collector,
+            cancel_checker,
+            audio_duration_seconds=duration_seconds,
+            segment_progress_callback=_asr_segment_progress,
+        )
+        _check_cancel(cancel_checker)
+        prosody = extract_prosody(audio, sr, timing_collector, cancel_checker)
     _check_cancel(cancel_checker)
 
     # Align text with prosody
@@ -136,9 +187,9 @@ def run_gap1(
         stage="aligning_transcript",
         stage_label="Aligning transcript",
         progress=0.42,
+        audio_duration_seconds=duration_seconds,
     )
-    with timed_stage(timing_collector, "align_text_prosody"):
-        aligned = align_text_prosody(segments, prosody, sr=sr)
+    aligned = align_text_prosody(segments, prosody, sr=sr)
     _check_cancel(cancel_checker)
 
     # Gap 1 base importance scoring (prosody + semantic fusion)
@@ -147,9 +198,9 @@ def run_gap1(
         stage="scoring_importance",
         stage_label="Scoring importance",
         progress=0.54,
+        audio_duration_seconds=duration_seconds,
     )
-    with timed_stage(timing_collector, "compute_importance"):
-        ranked_base = compute_importance(aligned)
+    ranked_base = compute_importance(aligned)
     _check_cancel(cancel_checker)
 
     _emit_progress(
@@ -157,16 +208,17 @@ def run_gap1(
         stage="adapting_context",
         stage_label="Adapting to meeting context",
         progress=0.64,
+        audio_duration_seconds=duration_seconds,
     )
-    with timed_stage(timing_collector, "detect_domain_pass_1"):
-        domain_result = detect_domain(
-            transcript=sorted(ranked_base, key=lambda x: x["start"]),
-            summary=None,
-            speaker_summaries=None,
-        )
+    _session_ctx = (result_metadata or {}).get("filename") if result_metadata else None
+    domain_result = detect_domain(
+        transcript=sorted(ranked_base, key=lambda x: x["start"]),
+        summary=None,
+        speaker_summaries=None,
+        session_context=_session_ctx,
+    )
     _check_cancel(cancel_checker)
-    with timed_stage(timing_collector, "apply_domain_adaptation"):
-        ranked = apply_domain_adaptation(ranked_base, domain_result)
+    ranked = apply_domain_adaptation(ranked_base, domain_result)
     focus_keywords = get_domain_focus_keywords(domain_result)
     domain_importance_threshold = get_domain_importance_threshold(domain_result)
     transcript_chronological = sorted(ranked, key=lambda x: x["start"])
@@ -183,6 +235,7 @@ def run_gap1(
         stage_label="Transcript ready",
         progress=0.72,
         partial_result=transcript_partial,
+        audio_duration_seconds=duration_seconds,
     )
     _check_cancel(cancel_checker)
 
@@ -191,14 +244,14 @@ def run_gap1(
         stage="generating_highlights",
         stage_label="Generating highlights",
         progress=0.8,
+        audio_duration_seconds=duration_seconds,
     )
-    with timed_stage(timing_collector, "highlight_generation"):
-        highlights = top_substantive_highlights(
-            ranked,
-            n=5,
-            focus_keywords=focus_keywords,
-            min_importance_score=domain_importance_threshold,
-        )
+    highlights = top_substantive_highlights(
+        ranked,
+        n=5,
+        focus_keywords=focus_keywords,
+        min_importance_score=domain_importance_threshold,
+    )
     highlights_partial = _build_partial_result(
         transcript=transcript_chronological,
         duration_seconds=duration_seconds,
@@ -213,6 +266,7 @@ def run_gap1(
         stage_label="Highlights ready",
         progress=0.86,
         partial_result=highlights_partial,
+        audio_duration_seconds=duration_seconds,
     )
     _check_cancel(cancel_checker)
 
@@ -221,10 +275,8 @@ def run_gap1(
         stage="finalizing_insights",
         stage_label="Finalizing insights",
         progress=0.92,
+        audio_duration_seconds=duration_seconds,
     )
-    with timed_stage(timing_collector, "speaker_assignment"):
-        speakers = compute_speaker_contribution(ranked)
-    _check_cancel(cancel_checker)
 
     # Transcript in chronological order (includes domain-adapted importance fields).
     sorted_transcript = sorted(transcript_chronological, key=lambda x: x["start"])
@@ -234,26 +286,22 @@ def run_gap1(
         "summary": None,
         "speaker_summaries": [],
         "highlights": highlights,
-        "speakers": speakers,
         "importance_threshold": domain_importance_threshold,
     }
-    with timed_stage(timing_collector, "speaker_summary_generation"):
-        result["speaker_summaries"] = generate_speaker_summaries(
-            ranked,
-            top_ratio=1.0,
-            max_segments_per_speaker=80,
-        )
+    result["speaker_summaries"] = generate_speaker_summaries(
+        ranked,
+        top_ratio=1.0,
+        max_segments_per_speaker=80,
+    )
     _check_cancel(cancel_checker)
-    with timed_stage(timing_collector, "summary_generation"):
-        result["transcript"] = sorted(result["transcript"], key=lambda x: x["start"])
-        result["summary"] = generate_summary(result["transcript"], top_ratio=1.0, max_segments=150)
+    result["transcript"] = sorted(result["transcript"], key=lambda x: x["start"])
+    result["summary"] = generate_summary(result["transcript"], top_ratio=1.0, max_segments=150)
     summary_partial = _build_partial_result(
         transcript=transcript_chronological,
         duration_seconds=duration_seconds,
         highlights=highlights,
         summary=result["summary"],
         speaker_summaries=result["speaker_summaries"],
-        speakers=speakers,
         importance_threshold=domain_importance_threshold,
         metadata=result_metadata,
         partial_stage="summary_ready",
@@ -264,16 +312,17 @@ def run_gap1(
         stage_label="Summary ready",
         progress=0.96,
         partial_result=summary_partial,
+        audio_duration_seconds=duration_seconds,
     )
     _check_cancel(cancel_checker)
 
     # Final Gap 2 metadata for overview panel and explainability.
-    with timed_stage(timing_collector, "detect_domain_pass_2"):
-        refreshed_domain = detect_domain(
-            transcript=result["transcript"],
-            summary=result.get("summary"),
-            speaker_summaries=result.get("speaker_summaries"),
-        )
+    refreshed_domain = detect_domain(
+        transcript=result["transcript"],
+        summary=result.get("summary"),
+        speaker_summaries=result.get("speaker_summaries"),
+        session_context=_session_ctx,
+    )
     if refreshed_domain.get("predicted_domain") == domain_result.get("predicted_domain"):
         result["domain"] = refreshed_domain
     else:
@@ -290,5 +339,6 @@ def run_gap1(
         stage="completed",
         stage_label="Insights ready",
         progress=1.0,
+        audio_duration_seconds=duration_seconds,
     )
     return result

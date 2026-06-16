@@ -8,9 +8,6 @@ numpy>=1.24.0
 soundfile>=0.12.0
 # ASR: faster-whisper is 4x faster than openai-whisper with same/better accuracy
 faster-whisper>=1.0.0
-# PostgreSQL (research-grade storage for meetings)
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.0
 scikit-learn>=1.4.0
 scipy>=1.11.0
 joblib>=1.3.0
