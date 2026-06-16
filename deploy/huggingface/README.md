@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: Prosody-aware meeting summarisation — upload audio, get transcript, importance & domain
+short_description: Prosody-aware meeting summarisation demo
 ---
 
 # PROSE-MEET
