@@ -24,9 +24,9 @@ Re-run evaluation: `python backend/run_all_experiments.py --repo-root . --output
 
 ### Demo flow (for interviews)
 
-1. Start backend → `cd backend` → `python -m uvicorn main:app --reload`
-2. Start frontend → `cd frontend/prose-meet-frontend` → `npm run dev`
-3. Upload a short meeting clip → watch transcript, importance heatmap, domain label, and highlights populate.
+1. **Quick start (Windows):** `.\scripts\start-interview-demo.ps1` from repo root — or start backend + frontend manually (see **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)**).
+2. Open **http://localhost:5173** → upload a short meeting clip.
+3. Show transcript, importance heatmap, domain label, and highlights.
 4. Open **http://127.0.0.1:8000/docs** to show the REST API.
 
 ## Prerequisites (install before running)
@@ -150,13 +150,17 @@ npm run build
 ## Documentation
 
 - **[backend/README.md](backend/README.md)** — API overview, env vars (`.env.example`), supervised importance model training, evaluation (Gap 1/Gap 2), benchmark/ablation scripts, seed data templates (`backend/data/templates/`), deployment/production, and fine-tuned Whisper usage.
-- **[frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)** — Frontend setup and `VITE_API_BASE_URL` for configuring the backend API URL.
+- **[frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md)** — Frontend setup and `VITE_API_BASE_URL`.
+- **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)** — Free local interview demo (screen-share), warm-up checklist, and talking points.
+- **[DEPLOY.md](DEPLOY.md)** — Hosted deploy (Vercel + Railway).
 
-## Deployment
+## Deployment & interview demo
 
-**Live demo (recommended):** [Vercel](https://vercel.com) for the React UI + [Railway](https://railway.com) for the FastAPI/Whisper backend. Full step-by-step guide: **[DEPLOY.md](DEPLOY.md)**.
+**Free interview demo (recommended):** Run backend + frontend **locally** and screen-share — no Railway cost. Step-by-step: **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)** · quick start: `.\scripts\start-interview-demo.ps1`
 
-For production or a self-hosted deployment:
+**Full hosted demo (paid):** [Vercel](https://vercel.com) + [Railway](https://railway.com) — see **[DEPLOY.md](DEPLOY.md)**.
+
+For self-hosted production:
 
 - **Backend:** Configure `WHISPER_MODEL` (path or preset) and set `BACKEND_CORS_ORIGINS` to your frontend origin(s). See the **Deployment / production** section in [backend/README.md](backend/README.md) and `backend/.env.example`. Docker: `backend/Dockerfile`.
 - **Frontend:** Set `VITE_API_BASE_URL` to your backend API URL when building (`npm run build`). See [frontend/prose-meet-frontend/README.md](frontend/prose-meet-frontend/README.md) and `frontend/prose-meet-frontend/.env.example`.

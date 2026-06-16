@@ -1,5 +1,7 @@
 # Deploy PROSE-MEET (Vercel + Railway)
 
+> **Free alternative:** For interviews without Railway, run everything locally and screen-share — see **[INTERVIEW_DEMO.md](INTERVIEW_DEMO.md)**.
+
 Live demo stack:
 
 | Part | Host | URL pattern |
