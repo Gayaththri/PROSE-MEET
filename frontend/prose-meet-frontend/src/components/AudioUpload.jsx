@@ -3,12 +3,35 @@ import { useRef, useState } from "react";
 import { runGap1 } from "../api/gap1";
 import Modal from "./Modal";
 
+const MAX_UPLOAD_MB = 100;
+const MAX_UPLOAD_BYTES = MAX_UPLOAD_MB * 1024 * 1024;
+
+function formatSizeMb(bytes) {
+  return (bytes / (1024 * 1024)).toFixed(2);
+}
+
 export default function AudioUpload({ onJobCreated }) {
   const fileInputRef = useRef(null);
 
   const [open, setOpen] = useState(false);
   const [file, setFile] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [fileError, setFileError] = useState(null);
+
+  const validateFile = (selected) => {
+    if (!selected) return null;
+    if (selected.size > MAX_UPLOAD_BYTES) {
+      return `File is ${formatSizeMb(selected.size)} MB. Maximum is ${MAX_UPLOAD_MB} MB. Use a 30–60 second clip for demos.`;
+    }
+    return null;
+  };
+
+  const applyFile = (selected) => {
+    if (!selected) return;
+    const err = validateFile(selected);
+    setFileError(err);
+    setFile(err ? null : selected);
+  };
 
   // Open file picker
   const handleBrowseClick = () => {
@@ -17,18 +40,14 @@ export default function AudioUpload({ onJobCreated }) {
 
   // File selected via input
   const handleFileChange = (e) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-    setFile(selected);
+    applyFile(e.target.files?.[0]);
   };
 
   // File dropped onto dropzone
   const handleDrop = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    const dropped = e.dataTransfer?.files?.[0];
-    if (!dropped) return;
-    setFile(dropped);
+    applyFile(e.dataTransfer?.files?.[0]);
   };
 
   const handleDragOver = (e) => {
@@ -53,7 +72,14 @@ export default function AudioUpload({ onJobCreated }) {
       setFile(null);
     } catch (err) {
       console.error(err);
-      alert("Failed to start audio processing");
+      const tooLarge =
+        file.size > MAX_UPLOAD_BYTES ||
+        err?.response?.status === 413;
+      alert(
+        tooLarge
+          ? `File too large (max ${MAX_UPLOAD_MB} MB). Trim to 30–60 seconds and try again.`
+          : "Failed to start audio processing. On the free demo host, use a short clip under 20 MB.",
+      );
     } finally {
       setLoading(false);
     }
@@ -80,9 +106,16 @@ export default function AudioUpload({ onJobCreated }) {
         <div className="saas-modal-copy">
           <p className="saas-modal-eyebrow">Upload audio or video</p>
           <p className="saas-modal-description">
-            Supported formats: all audio files, plus MP4, WebM, and AVI video files.
+            Supported: audio, MP4, WebM, AVI. Max {MAX_UPLOAD_MB} MB — use a{" "}
+            <strong>30–60 second</strong> clip on the live demo.
           </p>
         </div>
+
+        {fileError && (
+          <p className="saas-modal-description" style={{ color: "#b45309" }}>
+            {fileError}
+          </p>
+        )}
 
         <input
           ref={fileInputRef}
